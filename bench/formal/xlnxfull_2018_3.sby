@@ -1,0 +1,24 @@
+[tasks]
+cvr
+prf
+
+[options]
+cvr: mode cover
+cvr: depth 60
+prf: mode bmc
+prf: depth 40
+append 0
+
+[engines]
+smtbmc boolector
+# smtbmc z3
+# abc bmc3
+
+[script]
+read -formal xlnxfull_2018_3.v
+read -formal faxi_slave.v
+prep -top xlnxfull_2018_3
+
+[files]
+xlnxfull_2018_3.v
+faxi_slave.v

@@ -320,13 +320,20 @@ module	aximrd2wbsp #(
 	always @(*)
 		next_rptr = fifo_rptr + 1'b1;
 
-	always @(posedge i_axi_clk)
-	if (advance_ack)
-		ack_data <= response_fifo[fifo_rptr[LGFIFO-1:0]];
+	reg	[LGFIFO-1:0]	w_rptr;
+	always @(*)
+	if ((o_axi_rvalid)&&(i_axi_rready))
+		w_rptr = fifo_rptr + 1;
+	else
+		w_rptr = fifo_rptr;
 
 	always @(posedge i_axi_clk)
-	if (advance_ack)
-		rsp_data <= request_fifo[fifo_rptr[LGFIFO-1:0]];
+	if ((!o_axi_rvalid)||(i_axi_rready))
+		ack_data <= response_fifo[w_rptr];
+
+	always @(posedge i_axi_clk)
+	if ((!o_axi_rvalid)||(i_axi_rready))
+		rsp_data <= request_fifo[w_rptr];
 
 	always @(*)
 	if ((o_axi_rvalid)&&(i_axi_rready))
@@ -464,6 +471,7 @@ module	aximrd2wbsp #(
 
 	faxi_slave	#(.C_AXI_DATA_WIDTH(C_AXI_DATA_WIDTH),
 			.C_AXI_ADDR_WIDTH(C_AXI_ADDR_WIDTH),
+			.C_AXI_ID_WIDTH(C_AXI_ID_WIDTH),
 			.F_OPT_BURSTS(1'b0),
 			.F_LGDEPTH(F_LGDEPTH),
 			.F_AXI_MAXSTALL(0),
@@ -486,11 +494,13 @@ module	aximrd2wbsp #(
 			.i_axi_wlast(0),
 			.i_axi_wvalid(1'b0),
 			//
+			.i_axi_bid(0),
 			.i_axi_bresp(0),
 			.i_axi_bvalid(1'b0),
 			.i_axi_bready(1'b0),
 			//
 			.i_axi_arready(o_axi_arready),
+			.i_axi_arid(i_axi_arid),
 			.i_axi_araddr(i_axi_araddr),
 			.i_axi_arlen(i_axi_arlen),
 			.i_axi_arsize(i_axi_arsize),
@@ -502,6 +512,7 @@ module	aximrd2wbsp #(
 			.i_axi_arvalid(i_axi_arvalid),
 			//
 			.i_axi_rresp(o_axi_rresp),
+			.i_axi_rid(o_axi_rid),
 			.i_axi_rvalid(o_axi_rvalid),
 			.i_axi_rdata(o_axi_rdata),
 			.i_axi_rlast(o_axi_rlast),
@@ -511,13 +522,12 @@ module	aximrd2wbsp #(
 			.f_axi_rd_outstanding(f_axi_rd_outstanding),
 			.f_axi_wr_nbursts(),
 			.f_axi_awr_outstanding(f_axi_awr_outstanding),
-			.f_axi_awr_nbursts(),
-			//
-			.f_axi_rd_count(f_axi_rd_count),
-			.f_axi_rdfifo(f_axi_rdfifo));
+			.f_axi_awr_nbursts());
 
 	always @(*)
 		assert(f_axi_awr_outstanding == 0);
 
+	always @(*)
+		assume(!i_wb_err);
 `endif
 endmodule

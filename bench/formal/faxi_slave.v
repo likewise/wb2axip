@@ -53,15 +53,15 @@ module faxi_slave #(
 	parameter [7:0] F_AXI_MAXBURST	= 8'hff,// Maximum burst length, minus 1
 	parameter 	F_LGDEPTH	= 10,
 	parameter 	F_LGFIFO	= 3,
-	parameter	[(C_AXI_ID_WIDTH-1):0]	F_AXI_MAXSTALL = 3,
-	parameter	[(C_AXI_ID_WIDTH-1):0]	F_AXI_MAXDELAY = 3
+	parameter	[(F_LGDEPTH-1):0]	F_AXI_MAXSTALL = 3,
+	parameter	[(F_LGDEPTH-1):0]	F_AXI_MAXDELAY = 3
 	) (
 	input	wire			i_clk,	// System clock
 	input	wire			i_axi_reset_n,
 
 // AXI write address channel signals
 	input	wire			i_axi_awready,//Slave is ready to accept
-	// input wire	[C_AXI_ID_WIDTH-1:0]	i_axi_awid,	// Write ID
+	input	wire	[C_AXI_ID_WIDTH-1:0]	i_axi_awid,	// Write ID
 	input	wire	[AW-1:0]	i_axi_awaddr,	// Write address
 	input	wire	[7:0]		i_axi_awlen,	// Write Burst Length
 	input	wire	[2:0]		i_axi_awsize,	// Write Burst size
@@ -80,14 +80,14 @@ module faxi_slave #(
 	input	wire			i_axi_wvalid,	// Write valid
 
 // AXI write response channel signals
-	// input wire [C_AXI_ID_WIDTH-1:0] i_axi_bid,	// Response ID
+	input	wire [C_AXI_ID_WIDTH-1:0] i_axi_bid,	// Response ID
 	input	wire	[1:0]		i_axi_bresp,	// Write response
 	input	wire			i_axi_bvalid,  // Write reponse valid
 	input	wire			i_axi_bready,  // Response ready
 
 // AXI read address channel signals
 	input	wire			i_axi_arready,	// Read address ready
-	// input wire	[C_AXI_ID_WIDTH-1:0]	i_axi_arid,	// Read ID
+	input	wire	[C_AXI_ID_WIDTH-1:0]	i_axi_arid,	// Read ID
 	input	wire	[AW-1:0]	i_axi_araddr,	// Read address
 	input	wire	[7:0]		i_axi_arlen,	// Read Burst Length
 	input	wire	[2:0]		i_axi_arsize,	// Read Burst size
@@ -99,7 +99,7 @@ module faxi_slave #(
 	input	wire			i_axi_arvalid,	// Read address valid
 
 // AXI read data channel signals
-	// input wire [C_AXI_ID_WIDTH-1:0] i_axi_rid,     // Response ID
+	input wire [C_AXI_ID_WIDTH-1:0] i_axi_rid,     // Response ID
 	input	wire	[1:0]		i_axi_rresp,   // Read response
 	input	wire			i_axi_rvalid,  // Read reponse valid
 	input	wire	[DW-1:0]	i_axi_rdata,    // Read data
@@ -116,10 +116,15 @@ module faxi_slave #(
 	// output	reg	[(9-1):0]	f_axi_wr_pending,
 	// 
 	// RD_COUNT: increment on read w/o last, cleared on read w/ last
-	output	reg	[(9-1):0]		f_axi_rd_count,
-	output	reg	[(72-1):0]	f_axi_rdfifo
+	output reg	[C_AXI_ID_WIDTH-1:0]	f_axi_rd_checkid,
+	output reg			    	f_axi_rd_ckvalid,
+	output reg	[9-1:0]			f_axi_rd_cklen,
+
+	output	reg	[F_LGDEPTH-1:0]		f_axi_rdid_nbursts,
+	output	reg	[F_LGDEPTH-1:0]		f_axi_rdid_outstanding,
+	output	reg	[F_LGDEPTH-1:0]		f_axi_rdid_ckign_nbursts,
+	output	reg	[F_LGDEPTH-1:0]		f_axi_rdid_ckign_outstanding
 );
-	reg	[(9-1):0]	f_axi_wr_count;
 
 //*****************************************************************************
 // Parameter declarations
@@ -148,7 +153,6 @@ module faxi_slave #(
 //*****************************************************************************
 
 
-	// wire	w_fifo_full;
 	wire	axi_rd_ack, axi_wr_ack, axi_ard_req, axi_awr_req, axi_wr_req,
 		axi_rd_err, axi_wr_err;
 	//
@@ -361,7 +365,8 @@ module faxi_slave #(
 
 		initial	f_axi_wstall = 0;
 		always @(posedge i_clk)
-		if ((!i_axi_reset_n)||(!i_axi_wvalid)||(i_axi_wready))
+		if ((!i_axi_reset_n)||(!i_axi_wvalid)||(i_axi_wready)
+				||(i_axi_bvalid))
 			f_axi_wstall <= 0;
 		else if ((!i_axi_bvalid)||(i_axi_bready))
 			f_axi_wstall <= f_axi_wstall + 1'b1;
@@ -375,7 +380,8 @@ module faxi_slave #(
 		//
 		initial	f_axi_arstall = 0;
 		always @(posedge i_clk)
-		if ((!i_axi_reset_n)||(!i_axi_arvalid)||(i_axi_arready))
+		if ((!i_axi_reset_n)||(!i_axi_arvalid)||(i_axi_arready)
+				||(i_axi_rvalid))
 			f_axi_arstall <= 0;
 		else if ((!i_axi_rvalid)||(i_axi_rready))
 			f_axi_arstall <= f_axi_arstall + 1'b1;
@@ -421,7 +427,7 @@ module faxi_slave #(
 	if (!i_axi_reset_n)
 		f_axi_awr_outstanding <= 0;
 	else case({ (axi_awr_req), (axi_wr_req) })
-		2'b10: f_axi_awr_outstanding <= f_axi_awr_outstanding + i_axi_awlen-1;
+		2'b10: f_axi_awr_outstanding <= f_axi_awr_outstanding + i_axi_awlen+1;
 		2'b01: f_axi_awr_outstanding <= f_axi_awr_outstanding - 1'b1;
 		2'b11: f_axi_awr_outstanding <= f_axi_awr_outstanding + i_axi_awlen; // +1 -1
 		default: begin end
@@ -507,7 +513,7 @@ module faxi_slave #(
 	generate if (F_AXI_MAXDELAY > 0)
 	begin : CHECK_MAX_DELAY
 
-		reg	[(C_AXI_ID_WIDTH):0]	f_axi_wr_ack_delay,
+		reg	[(F_LGDEPTH-1):0]	f_axi_wr_ack_delay,
 						f_axi_awr_ack_delay,
 						f_axi_rd_ack_delay;
 
@@ -582,6 +588,15 @@ module faxi_slave #(
 
 	////////////////////////////////////////////////////////////////////////
 	//
+	// Xilinx extensions
+	//
+	////////////////////////////////////////////////////////////////////////
+	always @(posedge i_clk)
+	if (f_axi_wr_nbursts > 0)
+		`SLAVE_ASSUME(i_axi_wvalid);
+
+	////////////////////////////////////////////////////////////////////////
+	//
 	//
 	//
 	////////////////////////////////////////////////////////////////////////
@@ -602,162 +617,109 @@ module faxi_slave #(
 			`SLAVE_ASSUME(i_axi_arlen == 0);
 
 		always @(*)
+		if (i_axi_rvalid)
+			`SLAVE_ASSERT(i_axi_rlast);
+
+		always @(*)
 			`SLAVE_ASSERT(f_axi_rd_nbursts == f_axi_rd_outstanding);
 	end endgenerate
 
-	reg	[7:0]	wrfifo	[0:((1<<F_LGDEPTH)-1)];
-	reg	[7:0]	rdfifo	[0:((1<<F_LGDEPTH)-1)];
-	reg	[F_LGDEPTH-1:0]	rd_rdaddr, wr_rdaddr, rd_wraddr, wr_wraddr;
-	reg	[7:0]	rdfifo_data, wrfifo_data;
-	reg	[F_LGDEPTH-1:0]	rdfifo_outstanding;
-	wire	[7:0]		this_wlen;
-	wire	[F_LGDEPTH-1:0]	wrfifo_fill, rdfifo_fill;
 
-	/*
-	always @(posedge i_clk)
-	if (!i_axi_reset_n)
-	begin
-		f_axi_wburst_fifo <= 0;
-	end else case({ axi_awr_req , axi_wr_req, i_axi_wrlast })
-		3'b010:
-			f_axi_wburst_fifo[7:0] <= f_axi_wburst_fifo[7:0]-1;
-		3'b011: begin
-			`SLAVE_ASSUME(f_axi_wburst_fifo[7:0] == 0);
-			f_axi_wburst_fifo <= { 8'h0, f_axi_wburst_fifo[63:8] };
-			end
-		3'b100:
-			`SLAVE_ASSUME(f_axi_awr_nbursts < 8);
-			f_axi_wburst_fifo <= f_axi_wburst_fifo
-				| ((i_axi_awlen)<<(f_axi_awr_nbursts * 8));
-		3'b11:
-			f_axi_wburst_fifo <= { 8'h0, f_axi_wburst_fifo[63:8] }
-				| ((i_axi_awlen)<<((f_axi_awr_nbursts-1) * 8));
-		default:
-	endcase
-	*/
-
-       //
-       // Count the number of write elements received since the last wlast
-	initial	f_axi_wr_count = 0;
-	always @(posedge i_clk)
-	if (!i_axi_reset_n)
-		f_axi_wr_count <= 0;
-	else if (axi_wr_req)
-	begin
-		if (i_axi_wlast)
-			f_axi_wr_count <= 1'b0;
-		else
-			f_axi_wr_count <= f_axi_wr_count + 1'b1;
-	end
-
-	//
-	// Write information to the write FIFO
-	initial	wr_wraddr = 0;
-	always @(posedge i_clk)
-	if (!i_axi_reset_n)
-		wr_wraddr <= 0;
-	else if (axi_awr_req)
-		wr_wraddr <= wr_wraddr + 1'b1;
-
-	always @(posedge i_clk)
-	if (axi_awr_req)
-		wrfifo[wr_wraddr] <= { i_axi_awlen };
-
-	//
-	// Read information from the write queue
-	always @(*)
-		wrfifo_data = wrfifo[wr_rdaddr];
-
-	assign	this_wlen = wrfifo_data;
-
-	always @(*)
-	if ((i_axi_wvalid)&&(i_axi_wlast)&&(f_axi_awr_nbursts>0))
-		`SLAVE_ASSUME(i_axi_wlast == (this_wlen == f_axi_wr_count));
-
-	// Advance the read pointer for the write FIFO
-	initial	wr_rdaddr = 0;
-	always @(posedge i_clk)
-	if (!i_axi_reset_n)
-		wr_rdaddr <= 0;
-	else if ((axi_wr_req)&&(i_axi_wlast))
-		wr_rdaddr <= wr_rdaddr + 1'b1;
-
-	assign	wrfifo_fill = wr_wraddr - wr_rdaddr;
 
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Read FIFO
+	// Read Burst counting
 	//
-	parameter	NRDFIFO = 8;
-	parameter	WRDFIFO = 9;
+	(* anyseq *)	reg				f_axi_rd_check;
+	(* anyconst *)	reg	[C_AXI_ID_WIDTH-1:0]	r_axi_rd_checkid;
+	always @(*)
+		f_axi_rd_checkid = r_axi_rd_checkid;
 
-
-	initial	f_axi_rd_count = 0;
+	initial	f_axi_rdid_nbursts = 0;
+	initial	f_axi_rdid_outstanding = 0;
 	always @(posedge i_clk)
 	if (!i_axi_reset_n)
-		f_axi_rd_count <= 0;
-	else if (axi_rd_ack)
 	begin
+		f_axi_rdid_nbursts <= 0;
+		f_axi_rdid_outstanding <= 0;
+	end else case({	(i_axi_arvalid&& i_axi_arready&&
+				(i_axi_arid == f_axi_rd_checkid)),
+			(i_axi_rvalid && i_axi_rready &&
+				(i_axi_rid == f_axi_rd_checkid)) })
+	2'b01: begin
 		if (i_axi_rlast)
-			f_axi_rd_count <= 1'b0;
-		else
-			f_axi_rd_count <= f_axi_rd_count + 1'b1;
-	end
-
-	always @(*)
-		`SLAVE_ASSUME(f_axi_rd_nbursts <= NRDFIFO);
-
-/*
-	always @(*)
-	if (i_axi_rvalid)
-	begin
-		if (i_axi_rlast)
-			`SLAVE_ASSERT(f_axi_rdfifo[WRDFIFO-1:0] == f_axi_rd_count);
-		else
-			`SLAVE_ASSERT(f_axi_rdfifo[WRDFIFO-1:0] < f_axi_rd_count);
-	end
-
-	always @(posedge i_clk)
-	if (!i_axi_reset_n)
-		f_axi_rdfifo <= 0;
-	else casez({ axi_ard_req, axi_rd_ack, i_axi_rlast })
-	3'b10?:	f_axi_rdfifo[ f_axi_rd_nbursts*WRDFIFO +: WRDFIFO]
-						<= { 1'b0, i_axi_arlen };
-	// 3'b010:	f_axi_rdfifo[ 8:0] <= f_axi_rdfifo[8:0] - 1'b1;
-	3'b011:	f_axi_rdfifo <= { {(WRDFIFO){1'b0}},
-				f_axi_rdfifo[NRDFIFO*WRDFIFO-1:WRDFIFO] };
-	3'b111: begin
-		f_axi_rdfifo <= { {(WRDFIFO){1'b0}},
-				f_axi_rdfifo[NRDFIFO*WRDFIFO-1:WRDFIFO] };
-		f_axi_rdfifo[ (f_axi_rd_nbursts-1)*WRDFIFO +: WRDFIFO]
-				<= { 1'b0, i_axi_arlen };
+			f_axi_rdid_nbursts <= f_axi_rdid_nbursts - 1;
+		f_axi_rdid_outstanding <= f_axi_rdid_outstanding - 1;
+		end
+	2'b10: begin
+		f_axi_rdid_nbursts <= f_axi_rdid_nbursts + 1;
+		f_axi_rdid_outstanding <= f_axi_rdid_outstanding+i_axi_arlen+ 1;
+		end
+	2'b11: begin
+		if (!i_axi_rlast)
+			f_axi_rdid_nbursts <= f_axi_rdid_nbursts + 1;
+		f_axi_rdid_outstanding <= f_axi_rdid_outstanding + i_axi_arlen;
 		end
 	default: begin end
 	endcase
 
-	always @(*)
-	if (f_axi_rd_nbursts < NRDFIFO)
-		assert(f_axi_rdfifo[NRDFIFO * WRDFIFO-1: f_axi_rd_nbursts*WRDFIFO] == 0);
-
-	always @(*)
+	initial	f_axi_rdid_ckign_nbursts = 0;
+	initial	f_axi_rdid_ckign_outstanding = 0;
+	initial	f_axi_rd_ckvalid = 0;
+	initial	f_axi_rd_cklen = 0;
+	always @(posedge i_clk)
+	if (!i_axi_reset_n)
 	begin
-		rdfifo_outstanding = 0;
-		for(k = 0; k < NRDFIFO; k=k+1)
+		f_axi_rdid_ckign_nbursts <= 0;
+		f_axi_rdid_ckign_outstanding <= 0;
+		f_axi_rd_ckvalid <= 0;
+		f_axi_rd_cklen <= 0;
+	end else begin
+
+		if (!f_axi_rd_ckvalid && f_axi_rd_check && i_axi_arid == f_axi_rd_checkid
+			&& i_axi_arvalid && i_axi_arready)
 		begin
-			if (k < f_axi_rd_nbursts)
+			f_axi_rd_ckvalid <= 1'b1;
+			f_axi_rdid_ckign_nbursts <= f_axi_rdid_nbursts
+			  - ((i_axi_rvalid && i_axi_rready
+				&& i_axi_rid == f_axi_rd_checkid
+				&& i_axi_rlast) ? 1:0);
+			f_axi_rdid_ckign_outstanding <= f_axi_rdid_outstanding
+			  - ((i_axi_rvalid && i_axi_rready
+				&& i_axi_rid == f_axi_rd_checkid) ? 1:0);
+			f_axi_rd_cklen <= i_axi_arlen + 1;
+		end else if (f_axi_rd_ckvalid && i_axi_rvalid && i_axi_rready
+					&& i_axi_rid == f_axi_rd_checkid)
+		begin
+			if (f_axi_rdid_ckign_nbursts > 0)
 			begin
-			rdfifo_outstanding = rdfifo_outstanding
-				+ f_axi_rdfifo[k * WRDFIFO +: WRDFIFO] + 1;
+				if (i_axi_rlast)
+					f_axi_rdid_ckign_nbursts <= f_axi_rdid_ckign_nbursts-1;
+				f_axi_rdid_ckign_outstanding <= f_axi_rdid_ckign_outstanding-1;
+			end else begin
+				`SLAVE_ASSERT(i_axi_rlast == (f_axi_rd_cklen == 1));
+				f_axi_rd_cklen <= f_axi_rd_cklen - 1;
+				if (i_axi_rlast)
+					f_axi_rd_ckvalid <= 1'b0;
 			end
-			assert(f_axi_rdfifo[k*WRDFIFO+(WRDFIFO-1)] == 1'b0);
 		end
 	end
 
-	always @(posedge i_clk)
-		assert(rdfifo_outstanding - f_axi_rd_count
-					== f_axi_rd_outstanding);
-*/
-
 	always @(*)
-		f_axi_rdfifo = 0;
+		assert(f_axi_rdid_outstanding <= f_axi_rd_outstanding);
+	always @(*)
+		assert(f_axi_rdid_nbursts <= f_axi_rd_nbursts);
+	always @(*)
+	if (f_axi_rd_ckvalid)
+		assert(f_axi_rdid_ckign_nbursts <= f_axi_rdid_nbursts);
+	always @(*)
+	if (f_axi_rd_ckvalid)
+		assert(f_axi_rdid_ckign_outstanding <= f_axi_rdid_outstanding);
+	always @(*)
+	if (!f_axi_rd_ckvalid)
+	begin
+		assert(f_axi_rd_cklen == 0);
+		assert(f_axi_rdid_ckign_nbursts == 0);
+		assert(f_axi_rdid_ckign_outstanding == 0);
+	end
 endmodule
