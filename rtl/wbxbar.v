@@ -563,11 +563,18 @@ module	wbxbar(i_clk, i_reset,
 				if (mnearfull[N])
 					o_mstall[N] = 1'b1;
 
-				if (grant[N][NS] ||(timed_out[N]&&!o_mack[0]))
+				if (timed_out[N]&&!o_mack[0])
 				begin
-					o_mstall[N] = !grant[N][NS];
+					o_mstall[N] = 1'b0;
 					o_mack[N]   = 1'b0;
-					o_merr[N]   = i_mcyc[N] && (!grant[N][NS] || i_mstb[N]);
+					o_merr[N]   = 1'b1;
+				end
+
+				if (grant[N][NS] && m_stb[N])
+				begin
+					o_mstall[N] = 1'b0;
+					o_mack[N]   = 1'b0;
+					o_merr[N]   = 1'b1;
 				end
 
 				if (!m_cyc[N])
@@ -689,7 +696,8 @@ module	wbxbar(i_clk, i_reset,
 
 
 	generate if (OPT_TIMEOUT > 0)
-	begin
+	begin : CHECK_TIMEOUT
+
 		for(N=0; N<NM; N=N+1)
 		begin
 
@@ -876,7 +884,7 @@ module	wbxbar(i_clk, i_reset,
 				assert(i_mwe[N] == o_swe[iM]);
 			if (o_scyc[iM] && i_sack[iM])
 				assert(i_mwe[N] == o_swe[iM]);
-			if (o_merr[N])
+			if (o_merr[N] && !timed_out[N])
 				assert(i_mwe[N] == o_swe[iM]);
 			if (o_scyc[iM] && i_serr[iM])
 				assert(i_mwe[N] == o_swe[iM]);

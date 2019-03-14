@@ -61,9 +61,9 @@ opt_timeout:     chparam -set OPT_TIMEOUT  20 wbxbar
 ~opt_timeout:    chparam -set OPT_TIMEOUT   0 wbxbar
 opt_starvation:  chparam -set OPT_STARVATION_TIMEOUT  1 wbxbar
 ~opt_starvation: chparam -set OPT_TIMEOUT   0 wbxbar
-prep -top wbxbar2
+prep -top wbxbar
 
 [files]
-wbxbar.v
+../../rtl/wbxbar.v
 fwb_slave.v
 fwb_master.v
