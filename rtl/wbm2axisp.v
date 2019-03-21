@@ -343,9 +343,7 @@ module wbm2axisp #(
 			reg	[(C_AXI_DATA_WIDTH-1):0] reorder_fifo_data [0:(FIFOLN-1)];
 
 			always @(posedge i_clk)
-				if ((o_axi_rready)&&(i_axi_rvalid))
-					reorder_fifo_data[i_axi_rid] <= i_axi_rdata;
-			always @(posedge i_clk)
+			if ((o_axi_rready)&&(i_axi_rvalid))
 				reorder_fifo_data[i_axi_rid] <= i_axi_rdata;
 			always @(posedge i_clk)
 			case(reorder_fifo_addr[fifo_tail])
@@ -370,19 +368,19 @@ module wbm2axisp #(
 
 		reg	[1:0]	low_addr;
 		always @(posedge i_clk)
-			if ((i_wb_stb)&&(!o_wb_stall))
-				low_addr <= i_wb_addr[1:0];
+		if ((i_wb_stb)&&(!o_wb_stall))
+			low_addr <= i_wb_addr[1:0];
 		always @(posedge i_clk)
-			if ((o_axi_arvalid)&&(i_axi_arready))
-				reorder_fifo_addr[o_axi_arid] <= low_addr;
+		if ((o_axi_arvalid)&&(i_axi_arready))
+			reorder_fifo_addr[o_axi_arid] <= low_addr;
 
 		if (STRICT_ORDER == 0)
 		begin
 			reg	[(C_AXI_DATA_WIDTH-1):0] reorder_fifo_data [0:(FIFOLN-1)];
 
 			always @(posedge i_clk)
-				if ((o_axi_rready)&&(i_axi_rvalid))
-					reorder_fifo_data[i_axi_rid] <= i_axi_rdata;
+			if ((o_axi_rready)&&(i_axi_rvalid))
+				reorder_fifo_data[i_axi_rid] <= i_axi_rdata;
 			always @(posedge i_clk)
 			case(reorder_fifo_addr[fifo_tail][1:0])
 			2'b00: o_wb_data <=reorder_fifo_data[fifo_tail][(  DW-1):    0 ];
