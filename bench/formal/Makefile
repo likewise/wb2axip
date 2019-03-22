@@ -155,6 +155,20 @@ wbxbar_prf4x8_lp/PASS:       $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 $(WBXBAR4x8): wbxbar_prf4x8_cheap/PASS
 wbxbar_prf4x8_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x8_cheap
+#
+$(WBXBAR4x8): wbxbar_cvr4x8_buflp/PASS
+wbxbar_cvr4x8_buflp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr4x8_buflp
+$(WBXBAR4x8): wbxbar_cvr4x8_buf/PASS
+wbxbar_cvr4x8_buf/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr4x8_buf
+$(WBXBAR4x8): wbxbar_cvr4x8_lp/PASS
+wbxbar_cvr4x8_lp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr4x8_lp
+$(WBXBAR4x8): wbxbar_cvr4x8_cheap/PASS
+wbxbar_cvr4x8_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr4x8_cheap
+#
 $(WBXBAR4x8): wbxbar_prf4x8_buflpko/PASS
 wbxbar_prf4x8_buflpko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x8_buflpko
@@ -191,6 +205,20 @@ wbxbar_prf1x8_lp/PASS:       $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 $(WBXBAR1x8): wbxbar_prf1x8_cheap/PASS
 wbxbar_prf1x8_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_cheap
+#
+$(WBXBAR1x8): wbxbar_cvr1x3_buflp/PASS
+wbxbar_cvr1x3_buflp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr1x3_buflp
+$(WBXBAR1x8): wbxbar_cvr1x3_buf/PASS
+wbxbar_cvr1x3_buf/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr1x3_buf
+$(WBXBAR1x8): wbxbar_cvr1x3_lp/PASS
+wbxbar_cvr1x3_lp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr1x3_lp
+$(WBXBAR1x8): wbxbar_cvr1x3_cheap/PASS
+wbxbar_cvr1x3_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr1x3_cheap
+#
 $(WBXBAR1x8): wbxbar_prf1x8_buflpko/PASS
 wbxbar_prf1x8_buflpko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_buflpko
@@ -227,6 +255,20 @@ wbxbar_prf4x1_lp/PASS:       $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 $(WBXBAR4x1): wbxbar_prf4x1_cheap/PASS
 wbxbar_prf4x1_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x1_cheap
+#
+$(WBXBAR4x1): wbxbar_cvr4x1_buflp/PASS
+wbxbar_cvr4x1_buflp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr4x1_buflp
+$(WBXBAR4x1): wbxbar_cvr4x1_buf/PASS
+wbxbar_cvr4x1_buf/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr4x1_buf
+$(WBXBAR4x1): wbxbar_cvr4x1_lp/PASS
+wbxbar_cvr4x1_lp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr4x1_lp
+$(WBXBAR4x1): wbxbar_cvr4x1_cheap/PASS
+wbxbar_cvr4x1_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby cvr4x1_cheap
+#
 $(WBXBAR4x1): wbxbar_prf4x1_buflpko/PASS
 wbxbar_prf4x1_buflpko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x1_buflpko
