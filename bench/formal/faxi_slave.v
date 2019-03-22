@@ -313,7 +313,7 @@ module faxi_slave #(
 		if ((f_past_valid)&&($past(i_axi_bvalid))&&(!$past(i_axi_bready)))
 		begin
 			`SLAVE_ASSERT(i_axi_bvalid);
-			/// `SLAVE_ASSERT($stable(i_axi_bid));
+			`SLAVE_ASSERT($stable(i_axi_bid));
 			`SLAVE_ASSERT($stable(i_axi_bresp));
 		end
 	end

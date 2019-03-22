@@ -2,8 +2,8 @@
 prf
 
 [options]
-mode bmc
-depth 50
+mode prove
+depth 40
 
 [engines]
 smtbmc boolector

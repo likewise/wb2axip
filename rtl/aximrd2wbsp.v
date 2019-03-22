@@ -56,7 +56,7 @@ module	aximrd2wbsp #(
 	parameter C_AXI_DATA_WIDTH	= 32,// Width of the AXI R&W data
 	parameter C_AXI_ADDR_WIDTH	= 28,	// AXI Address width
 	parameter AW			= 26,	// AXI Address width
-	parameter LGFIFO                =  9	// Must be >= 8
+	parameter LGFIFO                =  3	// Must be >= 8
 	// parameter	WBMODE		= "B4PIPELINE"
 		// Could also be "BLOCK"
 	) (
@@ -122,11 +122,11 @@ module	aximrd2wbsp #(
 	reg				advance_ack;
 
 
-	reg			r_valid, last_stb, last_ack, err_state;
+	reg				r_valid, last_stb, last_ack, err_state;
 	reg	[C_AXI_ID_WIDTH-1:0]	axi_id;
-	reg	[LGFIFO:0]	fifo_wptr, fifo_ackptr, fifo_rptr;
-	reg		incr;
-	reg	[7:0]	stblen;
+	reg	[LGFIFO:0]		fifo_wptr, fifo_ackptr, fifo_rptr;
+	reg				incr;
+	reg	[7:0]			stblen;
 
 	wire	[C_AXI_ID_WIDTH-1:0]	w_id;//    r_id;
 	wire	[C_AXI_ADDR_WIDTH-1:0]	w_addr;//  r_addr;
@@ -139,24 +139,29 @@ module	aximrd2wbsp #(
 	wire	[3:0]			w_qos;//   r_qos;
 	wire	[LGFIFO:0]		fifo_fill;
 	wire	[LGFIFO:0]		max_fifo_fill;
+	wire				fifo_full, fifo_nearfull;
 	wire				accept_request;
 
 
 
 	assign	fifo_fill = (fifo_wptr - fifo_rptr);
+	assign	fifo_full = (fifo_fill == {1'b1,{LGFIFO{1'b0}}});
+	assign	fifo_nearfull = (fifo_fill == {1'b0,{LGFIFO{1'b1}}});
+
 	assign	max_fifo_fill = (1<<LGFIFO);
 
 	assign	accept_request = (i_axi_reset_n)&&(!err_state)
 			&&((!o_wb_cyc)||(!i_wb_err))
-			&&((!o_wb_stb)||(last_stb && !i_wb_stall))
+			&&(!fifo_full)
+			&&((!o_wb_stb && stblen == 0 && !last_stb)||(o_wb_stb && last_stb && !i_wb_stall))
 			&&(r_valid ||((i_axi_arvalid)&&(o_axi_arready)))
 			// The request must fit into our FIFO before making
 			// it
-			&&(fifo_fill + {{(LGFIFO-8){1'b0}},w_len} +1
-					< max_fifo_fill)
+			// &&(fifo_fill + {{(LGFIFO-8){1'b0}},w_len} +1
+			//		< max_fifo_fill)
 			// One ID at a time, lest we return a bus error
 			// to the wrong AXI master
-			&&((fifo_fill == 0)||(w_id == axi_id));
+			&&(((fifo_fill == 0)&&(!o_wb_stb))||(w_id == axi_id));
 
 
 	assign	i_rd_request = { i_axi_arid, i_axi_araddr, i_axi_arlen,
@@ -224,13 +229,20 @@ module	aximrd2wbsp #(
 		begin
 			// Process the new request
 			o_wb_cyc <= 1'b1;
-			o_wb_stb <= 1'b1;
+			if (fifo_nearfull)
+				o_wb_stb <= 1'b0;
+			else
+				o_wb_stb <= 1'b1;
 			last_stb <= (w_len == 0);
 
 			o_wb_addr <= w_addr[(C_AXI_ADDR_WIDTH-1):(C_AXI_ADDR_WIDTH-AW)];
 			incr <= w_burst[0];
 			stblen <= w_len;
 			axi_id <= w_id;
+		end else if ((!o_wb_stb)&&((stblen > 0)||(last_stb)))
+		begin
+			if (!fifo_full)
+				o_wb_stb <= 1'b1;
 		// end else if ((o_wb_cyc)&&(i_wb_err)||(err_state))
 		end else if (o_wb_stb && !last_stb)
 		begin
@@ -239,6 +251,8 @@ module	aximrd2wbsp #(
 
 			o_wb_addr <= o_wb_addr + ((incr)? 1'b1:1'b0);
 			stblen <= stblen - 1'b1;
+			if (fifo_nearfull)
+				o_wb_stb <= 1'b0;
 
 			if (i_wb_err)
 			begin
@@ -398,7 +412,7 @@ module	aximrd2wbsp #(
 	//
 	//
 	always @(*)
-	if (o_wb_stb)
+	if (o_wb_stb || midrequest)
 		assert(last_stb == (stblen == 0));
 	else
 		assert((!last_stb)&&(stblen == 0));
@@ -414,9 +428,9 @@ module	aximrd2wbsp #(
 	always @(*)
 		assert(!err_state);
 	*/
-	always @(*)
-	if ((!err_state)&&(o_axi_rvalid))
-		assert(o_axi_rresp == 2'b00);
+	// always @(*)
+	// if ((!err_state)&&(o_axi_rvalid))
+	//	assert(o_axi_rresp == 2'b00);
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -430,9 +444,12 @@ module	aximrd2wbsp #(
 
 	always @(*)
 	if (o_wb_stb)
-		assert(f_fifo_used + stblen + 1 < {(LGFIFO){1'b1}});
+		assert(f_fifo_used + 1 <= {1'b1,{(LGFIFO){1'b0}}});
+	else if (midrequest)
+		assert(f_fifo_used + 3 > {1'b1,{(LGFIFO){1'b0}}});
 	else
-		assert(f_fifo_used < {(LGFIFO){1'b1}});
+		assert(f_fifo_used <= {1'b1,{(LGFIFO){1'b0}}});
+
 	always @(*)
 		assert(f_fifo_wb_used   <= f_fifo_used);
 	always @(*)
@@ -447,12 +464,19 @@ module	aximrd2wbsp #(
 		assert(fifo_rptr   == 0);
 	end
 
-	localparam	F_LGDEPTH = LGFIFO+1, F_LGRDFIFO = 72; // 9*F_LGFIFO;
+	localparam	F_LGDEPTH = (LGFIFO>8) ? LGFIFO+1 : 10, F_LGRDFIFO = 72; // 9*F_LGFIFO;
 	wire	[(9-1):0]		f_axi_rd_count;
 	wire	[(F_LGRDFIFO-1):0]	f_axi_rdfifo;
 	wire	[(F_LGDEPTH-1):0]	f_axi_rd_nbursts, f_axi_rd_outstanding,
 					f_axi_awr_outstanding,
+			f_axi_awr_nbursts, f_axi_rdid_nbursts,
+			f_axi_rdid_outstanding, f_axi_rdid_ckign_nbursts,
+			f_axi_rdid_ckign_outstanding,
 			f_wb_nreqs, f_wb_nacks, f_wb_outstanding;
+	//
+	wire				f_axi_rd_ckvalid;
+	wire	[C_AXI_ID_WIDTH-1:0]	f_axi_rd_checkid;
+	wire	[9-1:0]			f_axi_rd_cklen;
 
 	fwb_master #(.AW(AW), .DW(C_AXI_DATA_WIDTH), .F_MAX_STALL(2),
 		.F_MAX_ACK_DELAY(3), .F_LGDEPTH(F_LGDEPTH),
@@ -472,7 +496,7 @@ module	aximrd2wbsp #(
 	faxi_slave	#(.C_AXI_DATA_WIDTH(C_AXI_DATA_WIDTH),
 			.C_AXI_ADDR_WIDTH(C_AXI_ADDR_WIDTH),
 			.C_AXI_ID_WIDTH(C_AXI_ID_WIDTH),
-			.F_OPT_BURSTS(1'b0),
+			.F_OPT_BURSTS(1'b1),
 			.F_LGDEPTH(F_LGDEPTH),
 			.F_AXI_MAXSTALL(0),
 			.F_AXI_MAXDELAY(0))
@@ -522,12 +546,180 @@ module	aximrd2wbsp #(
 			.f_axi_rd_outstanding(f_axi_rd_outstanding),
 			.f_axi_wr_nbursts(),
 			.f_axi_awr_outstanding(f_axi_awr_outstanding),
-			.f_axi_awr_nbursts());
+			.f_axi_awr_nbursts(f_axi_awr_nbursts),
+			//
+			.f_axi_rd_checkid(f_axi_rd_checkid),
+			.f_axi_rd_ckvalid(f_axi_rd_ckvalid),
+			.f_axi_rd_cklen(f_axi_rd_cklen),
+			//
+			.f_axi_rdid_nbursts(f_axi_rdid_nbursts),
+			.f_axi_rdid_outstanding(f_axi_rdid_outstanding),
+			.f_axi_rdid_ckign_nbursts(f_axi_rdid_ckign_nbursts),
+			.f_axi_rdid_ckign_outstanding(f_axi_rdid_ckign_outstanding)
+			);
 
 	always @(*)
 		assert(f_axi_awr_outstanding == 0);
+	always @(*)
+		assert(f_axi_awr_nbursts == 0);
 
 	always @(*)
 		assume(!i_wb_err);
+
+	wire	midrequest;
+	assign	midrequest = (o_wb_stb || stblen > 0 || last_stb);
+
+	wire	[F_LGDEPTH:0]	f_outstanding_check;
+	assign	f_outstanding_check = fifo_fill + stblen + (r_valid ? (w_len+1):0);
+	always @(*)
+	if ((fifo_fill != 0)||(midrequest))
+	begin
+		// Match the number outstanding in the FIFO with the number of
+		// AXI read outstanding
+		assert(f_axi_rd_outstanding == f_outstanding_check
+				+ (midrequest ? 1:0));
+
+		if ((!r_valid)&&(f_axi_rd_checkid == axi_id))
+		begin // Everything is in the FIFO
+			assert(f_axi_rd_nbursts == f_axi_rdid_nbursts);
+			assert(f_axi_rd_outstanding == f_axi_rdid_outstanding);
+		end else if (!r_valid)
+		begin
+			// The stuff in the FIFO doesn't have this ID
+			assert(f_axi_rdid_nbursts == 0);
+			assert(f_axi_rdid_outstanding == 0);
+		end else if ((f_axi_rd_checkid == axi_id)&&(w_id == axi_id))
+		begin
+			// Both the FIFO and the item waiting have the same
+			// ID
+			assert(f_axi_rd_nbursts     == f_axi_rdid_nbursts);
+			assert(f_axi_rd_outstanding == f_axi_rdid_outstanding);
+		end else if ((f_axi_rd_checkid == axi_id)&&(w_id != axi_id))
+		begin
+			// The FIFO and the item waiting have different IDs
+			// The difference in the number of bursts matches
+			// what's in the hopper
+			assert(f_axi_rd_nbursts     == f_axi_rdid_nbursts+1);
+			assert(f_axi_rd_outstanding == f_axi_rdid_outstanding
+				+w_len+1);
+		end
+	end else if (!r_valid) begin
+		assert(!o_axi_rvalid);
+		assert(f_axi_rd_nbursts == 0);
+		assert(f_axi_rd_outstanding == 0);
+		assert(f_axi_rdid_nbursts == 0);
+		assert(f_axi_rdid_outstanding == 0);
+	end else if (r_valid) begin
+		assert(!o_axi_rvalid);
+		assert(f_axi_rd_nbursts == 1);
+		assert(f_axi_rd_outstanding == w_len+1);
+
+		if (w_id == f_axi_rd_checkid)
+		begin
+			assert(f_axi_rdid_nbursts == f_axi_rd_nbursts);
+			assert(f_axi_rdid_outstanding == f_axi_rd_outstanding);
+		end else begin
+			assert(f_axi_rdid_nbursts == 0);
+			assert(f_axi_rdid_outstanding == 0);
+		end
+	end
+
+	reg	[LGFIFO:0]	f_fifo_ackfill;
+	always @(*)
+		f_fifo_ackfill = fifo_ackptr - fifo_rptr;
+	always @(*)
+		assert(fifo_fill <= (1<<LGFIFO));
+	always @(*)
+		assert(f_fifo_ackfill <= fifo_fill);
+	always @(*)
+		assert(fifo_full == (fifo_fill == {1'b1,{LGFIFO{1'b0}}}));
+	always @(*)
+		assert(fifo_nearfull == (fifo_fill == {1'b0,{LGFIFO{1'b1}}}));
+
+	////////////////////////////////////////////////////////////////////////
+	reg	[(1<<LGFIFO)-1:0]	f_fifo_pos_wb;
+	reg	[(1<<LGFIFO)-1:0]	f_fifo_pos_valid;
+
+	genvar	f_idx;
+	generate for(f_idx=0; f_idx<(1<<LGFIFO); f_idx=f_idx+1)
+	begin : FIND_VALID_FIFO
+		// fifo_wptr, fifo_ackptr, fifo_rptr;
+		// next_ackptr = fifo_ackptr + 1'b1;
+		wire	[LGFIFO:0]	ack_d, read_d, wrap;
+		assign	ack_d  = f_idx - fifo_ackptr;
+		assign	read_d = f_idx - fifo_rptr;
+		assign	wrap   = { !fifo_wptr[LGFIFO], fifo_wptr[LGFIFO-1:0] };
+
+		always @(*)
+		if (wrap == fifo_ackptr)
+			f_fifo_pos_wb[f_idx] = 1'b1;
+		else
+			f_fifo_pos_wb[f_idx] = ({1'b0,ack_d[LGFIFO-1:0]} < f_fifo_wb_used);
+
+		always @(*)
+		if (wrap == fifo_rptr)
+			f_fifo_pos_valid[f_idx]= 1'b1;
+		else
+			f_fifo_pos_valid[f_idx] = ({1'b0,read_d[LGFIFO-1:0]} < f_fifo_used);
+
+	end endgenerate
+
+	always @(*)
+	if (o_axi_rvalid)
+	begin
+		assert(f_fifo_pos_valid[fifo_rptr[LGFIFO-1:0]]);
+		assert(!f_fifo_pos_wb[fifo_rptr[LGFIFO-1:0]]);
+		assert(rsp_data == request_fifo[fifo_rptr[LGFIFO-1:0]]);
+		assert(ack_data == response_fifo[fifo_rptr[LGFIFO-1:0]]);
+	end
+
+	reg	[F_LGDEPTH:0]	fifo_burst_count;
+	(* keep *) reg	[(1<<LGFIFO)-1:0]	fifo_burst_data;
+	integer	f_iidx;
+	always @(*)
+	begin
+		fifo_burst_count = 0;
+		fifo_burst_data = 0;
+		for(f_iidx=0; f_iidx < (1<<LGFIFO); f_iidx = f_iidx+1)
+		begin
+			if (f_fifo_pos_valid[f_iidx]
+				&&(request_fifo[f_iidx][C_AXI_ID_WIDTH]))
+			begin
+				fifo_burst_count = fifo_burst_count+1;
+				fifo_burst_data[f_iidx] = 1;
+			end
+		end
+	end
+
+	always @(*)
+	assert(fifo_burst_count
+		+ (r_valid ? 1:0) + (midrequest ? 1:0)
+		== f_axi_rd_nbursts);
+
+
+	localparam [0:0]	F_OPT_STABLE_ON_IDLE = 1'b1;
+	generate if (F_OPT_STABLE_ON_IDLE)
+	begin
+		always @(posedge i_axi_clk)
+		if (!i_axi_arvalid)
+		begin
+			assume($stable(i_axi_araddr));
+			assume($stable(i_axi_arlen));
+			assume($stable(i_axi_arid));
+			assume($stable(i_axi_arburst));
+			assume($stable(i_axi_arcache));
+			assume($stable(i_axi_arlock));
+			assume($stable(i_axi_arprot));
+			assume($stable(i_axi_arqos));
+			assume($stable(i_axi_arsize));
+		end
+
+		always @(posedge i_axi_clk)
+		if (i_wb_ack)
+			assume($changed(i_wb_data));
+		always @(*)
+		if (!i_wb_ack)
+			assume(i_wb_data == 0);
+	end endgenerate
 `endif
 endmodule
