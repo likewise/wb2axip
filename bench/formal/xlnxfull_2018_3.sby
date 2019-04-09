@@ -5,8 +5,8 @@ prf
 [options]
 cvr: mode cover
 cvr: depth 60
-prf: mode bmc
-prf: depth 40
+prf: mode prove
+prf: depth 15
 append 0
 
 [engines]
