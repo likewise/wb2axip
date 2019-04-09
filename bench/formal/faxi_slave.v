@@ -679,14 +679,19 @@ module faxi_slave #(
 		if (!f_axi_rd_ckvalid && f_axi_rd_check && i_axi_arid == f_axi_rd_checkid
 			&& i_axi_arvalid && i_axi_arready)
 		begin
+			//
+			// Decide to check the length of this burst
+			//
 			f_axi_rd_ckvalid <= 1'b1;
 			f_axi_rdid_ckign_nbursts <= f_axi_rdid_nbursts
 			  - ((i_axi_rvalid && i_axi_rready
 				&& i_axi_rid == f_axi_rd_checkid
 				&& i_axi_rlast) ? 1:0);
+
 			f_axi_rdid_ckign_outstanding <= f_axi_rdid_outstanding
 			  - ((i_axi_rvalid && i_axi_rready
 				&& i_axi_rid == f_axi_rd_checkid) ? 1:0);
+
 			f_axi_rd_cklen <= i_axi_arlen + 1;
 		end else if (f_axi_rd_ckvalid && i_axi_rvalid && i_axi_rready
 					&& i_axi_rid == f_axi_rd_checkid)
@@ -710,6 +715,11 @@ module faxi_slave #(
 	always @(*)
 		assert(f_axi_rdid_nbursts <= f_axi_rd_nbursts);
 	always @(*)
+	if (f_axi_rdid_outstanding == 0)
+		assert(f_axi_rdid_nbursts == 0);
+	else
+		assert(f_axi_rdid_nbursts > 0);
+	always @(*)
 	if (f_axi_rd_ckvalid)
 		assert(f_axi_rdid_ckign_nbursts <= f_axi_rdid_nbursts);
 	always @(*)
@@ -722,4 +732,8 @@ module faxi_slave #(
 		assert(f_axi_rdid_ckign_nbursts == 0);
 		assert(f_axi_rdid_ckign_outstanding == 0);
 	end
+
+	always @(*)
+	if (f_axi_rd_ckvalid)
+		assert(f_axi_rd_cklen > 0);
 endmodule
