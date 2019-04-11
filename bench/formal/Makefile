@@ -15,7 +15,7 @@
 ##
 ################################################################################
 ##
-## Copyright (C) 2017-2018, Gisselquist Technology, LLC
+## Copyright (C) 2017-2019, Gisselquist Technology, LLC
 ##
 ## This file is part of the pipelined Wishbone to AXI converter project, a
 ## project that contains multiple bus bridging designs and formal bus property
@@ -42,7 +42,7 @@
 ################################################################################
 ##
 ##
-TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar # wbm2axisp axim2wbsp
+TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar axilxbar # wbm2axisp axim2wbsp
 .PHONY: $(TESTS)
 all: $(TESTS)
 RTL := ../../rtl
@@ -63,10 +63,12 @@ RDLITE     := axilrd2wbsp
 WRLITE     := axilwr2wbsp
 AXLITE     := axlite2wbsp
 XILINXDEMO := xlnxdemo
+AXILXBAR   := axilxbar
 WBXBAR     := wbxbar
 WBXBAR4x8  := wbxbar4x8
 WBXBAR1x8  := wbxbar1x8
 WBXBAR4x1  := wbxbar4x1
+AXIL       := faxil_master.v faxil_slave.v
 WB         := fwb_master.v fwb_slave.v
 
 .PHONY: $(WBARB) $(WB2AXI) $(RDLITE) $(WRLITE) $(AXLITE) $(WB2LITE) $(DEMOAXI)
@@ -140,6 +142,46 @@ $(AXI2WB)/PASS: $(RTL)/aximwr2wbsp.v $(RTL)/aximrd2wbsp.v
 $(AXI2WB)/PASS: $(RTL)/wbarbiter.v
 	echo "The AXI2WB bridge does not work yet, so I do not expect this one to pass"
 	echo sby -f $(AXI2WB).sby
+
+.PHONY: $(AXILXBAR) $(AXILXBAR)prf $(AXILXBAR)cvr
+$(AXILXBAR): $(AXILXBAR)prf $(AXILXBAR)cvr
+$(AXILXBAR)prf: $(AXILXBAR)_prf4x8_lp/PASS
+$(AXILXBAR)prf: $(AXILXBAR)_prf1x8_lp/PASS
+$(AXILXBAR)prf: $(AXILXBAR)_prf4x1_lp/PASS
+$(AXILXBAR)prf: $(AXILXBAR)_prf4x8/PASS
+$(AXILXBAR)prf: $(AXILXBAR)_prf1x8/PASS
+$(AXILXBAR)prf: $(AXILXBAR)_prf4x1/PASS
+$(AXILXBAR)_prf4x8/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby prf4x8
+$(AXILXBAR)_prf1x8/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby prf1x8
+$(AXILXBAR)_prf4x1/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby prf4x1
+$(AXILXBAR)_prf4x8_lp/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby prf4x8_lp
+$(AXILXBAR)_prf1x8_lp/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby prf1x8_lp
+$(AXILXBAR)_prf4x1_lp/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby prf4x1_lp
+$(AXILXBAR)cvr: $(AXILXBAR)_cvr4x8_lp/PASS
+$(AXILXBAR)cvr: $(AXILXBAR)_cvr4x8/PASS
+$(AXILXBAR)cvr: $(AXILXBAR)_cvr1x3_lp/PASS
+$(AXILXBAR)cvr: $(AXILXBAR)_cvr1x3/PASS
+$(AXILXBAR)cvr: $(AXILXBAR)_cvr4x1_lp/PASS
+$(AXILXBAR)cvr: $(AXILXBAR)_cvr4x1/PASS
+$(AXILXBAR)_cvr4x8/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby cvr4x8
+$(AXILXBAR)_cvr1x3/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby cvr1x3
+$(AXILXBAR)_cvr4x1/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby cvr4x1
+$(AXILXBAR)_cvr4x8_lp/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby cvr4x8_lp
+$(AXILXBAR)_cvr1x3_lp/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby cvr1x3_lp
+$(AXILXBAR)_cvr4x1_lp/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
+	sby -f $(AXILXBAR).sby cvr4x1_lp
+
 
 .PHONY: $(WBXBAR) $(WBXBAR4x8) $(WBXBAR1x8) $(WBXBAR4x1)
 $(WBXBAR): $(WBXBAR4x8) $(WBXBAR1x8) $(WBXBAR4x1)
