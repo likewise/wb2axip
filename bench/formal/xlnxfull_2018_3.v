@@ -630,11 +630,14 @@ module xlnxfull_2018_3 #(
 `ifdef	FORMAL
 	localparam	F_LGDEPTH=10;
 
-	wire	[F_LGDEPTH-1:0]	f_axi_rd_nbursts,
-				f_axi_rd_outstanding,
-				f_axi_wr_nbursts,
-				f_axi_awr_outstanding,
-				f_axi_awr_nbursts;
+	wire	[F_LGDEPTH-1:0] f_axi_awr_nbursts,
+				f_axi_rd_nbursts,
+				f_axi_rd_outstanding;
+	wire	[9-1:0]		f_axi_wr_pending;
+	wire	[C_S_AXI_ID_WIDTH-1:0]	f_axi_wr_checkid;
+	wire				f_axi_wr_ckvalid;
+	wire	[F_LGDEPTH-1:0]		f_axi_wrid_nbursts;
+
 	//
 	wire	[C_S_AXI_ID_WIDTH-1:0]	f_axi_rd_checkid;
 	wire				f_axi_rd_ckvalid;
@@ -786,11 +789,14 @@ module xlnxfull_2018_3 #(
 		//
 		// Formal outputs
 		//
+		.f_axi_awr_nbursts(f_axi_awr_nbursts),
+		.f_axi_wr_pending(f_axi_wr_pending),
 		.f_axi_rd_nbursts(f_axi_rd_nbursts),
 		.f_axi_rd_outstanding(f_axi_rd_outstanding),
-		.f_axi_wr_nbursts(f_axi_wr_nbursts),
-		.f_axi_awr_outstanding(f_axi_awr_outstanding),
-		.f_axi_awr_nbursts(f_axi_awr_nbursts),
+		//
+		.f_axi_wr_checkid(f_axi_wr_checkid),
+		.f_axi_wr_ckvalid(f_axi_wr_ckvalid),
+		.f_axi_wrid_nbursts(f_axi_wrid_nbursts),
 		//
 		.f_axi_rd_checkid(f_axi_rd_checkid),
 		.f_axi_rd_ckvalid(f_axi_rd_ckvalid),
@@ -801,24 +807,85 @@ module xlnxfull_2018_3 #(
 		.f_axi_rdid_ckign_outstanding(f_axi_rdid_ckign_outstanding)
 	);
 
-	always @(*)
-	if (axi_arv_arr_flag || f_axi_rd_outstanding)
-		assume(!S_AXI_AWVALID && !S_AXI_WVALID);
+	localparam	[0:0]	F_OPT_WRITE_ONLY = 1'b0;
+	generate if (F_OPT_WRITE_ONLY)
+	begin
+		// Assume we are read only
+		always @(*)
+			assume(!S_AXI_ARVALID);
+		always @(*)
+			assert(!S_AXI_RVALID);
+		always @(*)
+			assert(axi_arv_arr_flag == 0);
 
-// Assume we are read only
+		always @(*)
+			assert(f_axi_rd_outstanding == 0);
+	end endgenerate
+
+	localparam	[0:0]	F_OPT_READ_ONLY = 1'b0;
+	generate if (F_OPT_READ_ONLY)
+	begin
+		// Assume we are read only
+		always @(*)
+			assume(!i_axi_awvalid);
+		always @(*)
+			assume(!i_axi_wvalid);
+		always @(*)
+			assert(!i_axi_bvalid);
+		always @(*)
+			assert(axi_awv_awr_flag == 0);
+
+		always @(*)
+			assert(f_axi_awr_nbursts == 0);
+
+	end endgenerate
+
 	always @(*)
-		assume(!S_AXI_AWVALID);
+		assert(!F_OPT_READ_ONLY || !F_OPT_WRITE_ONLY);
+
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Write induction properties
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 	always @(*)
-		assume(!S_AXI_WVALID);
+		assert((f_axi_wrid_nbursts == 0)
+				||(f_axi_wrid_nbursts == f_axi_awr_nbursts));
 	always @(*)
-		assert(!S_AXI_BVALID);
+		assert(f_axi_awr_nbursts <= 1);
+
 	always @(*)
-		assert(axi_awv_awr_flag == 0);
+		assert(axi_awlen_cntr <= axi_awlen+1);
+
+	reg	[8:0]	f_wpending;
+	always @(*)
+		f_wpending = ({ 1'b0, axi_awlen} + 1 - { 1'b0, axi_awlen_cntr});
+
+	always @(*)
+	if (f_axi_wr_pending > 0)
+		assert(f_wpending == f_axi_wr_pending);
+
+	always @(*)
+	if (f_axi_wr_pending > 0)
+		assert(axi_awv_awr_flag);
+	else if (!S_AXI_AWREADY)
+		assert(!axi_awv_awr_flag);
+	always @(*)
+	if (f_axi_awr_nbursts > 0)
+		assert(axi_awv_awr_flag || S_AXI_BVALID);
+
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Read induction properties
+	//
+	////////////////////////////////////////////////////////////////////////
 	//
 	//
 	always @(*)
 		assert((f_axi_rdid_nbursts == 0)
-				||(f_axi_rd_nbursts == f_axi_rd_nbursts));
+				||(f_axi_rdid_nbursts == f_axi_rd_nbursts));
 	always @(*)
 		assert((f_axi_rdid_outstanding == 0)
 				||(f_axi_rdid_outstanding==f_axi_rd_outstanding));
@@ -858,6 +925,19 @@ module xlnxfull_2018_3 #(
 	// Cover properties
 	//
 	////////////////////////////////////////////////////////////////////////
+	//
+	//
+	reg	f_wr_cvr_valid;
+	initial	f_wr_cvr_valid = 0;
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN)
+		f_wr_cvr_valid <= 0;
+	else if (S_AXI_AWVALID && S_AXI_AWREADY && S_AXI_AWLEN > 4)
+		f_wr_cvr_valid <= 1;
+
+	always @(*)
+	if (!F_OPT_READ_ONLY)
+		cover(S_AXI_BVALID && f_wr_cvr_valid);
 
 	reg	f_rd_cvr_valid;
 	initial	f_rd_cvr_valid = 0;
@@ -868,11 +948,46 @@ module xlnxfull_2018_3 #(
 		f_rd_cvr_valid <= 1;
 
 	always @(*)
+	if (!F_OPT_WRITE_ONLY)
 		cover(S_AXI_RVALID && S_AXI_RLAST && f_rd_cvr_valid);
 
 	////////////////////////////////////////////////////////////////////////
+	//
+	// Assumptions necessary to pass a formal check
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
 	always @(*)
 		assume(S_AXI_ARID == 0);
+
+	always @(*)
+	if (f_axi_wr_pending > 0)
+		assume((f_axi_wr_ckvalid) == (S_AXI_AWID == f_axi_wr_checkid));
+	always @(*)
+	if (f_axi_awr_nbursts > 0)
+		assume((f_axi_wrid_nbursts>0) == (S_AXI_AWID == f_axi_wr_checkid));
+	always @(*)
+	if (S_AXI_WLAST)
+		assume(S_AXI_WVALID);
+	always @(*)
+	if (S_AXI_BVALID)
+		assume(S_AXI_BREADY);
+	always @(*)
+	if (S_AXI_BVALID)
+		assume(!S_AXI_AWVALID);
+
+	// This particular core can't handle both reads and writes at the
+	// same time.  To avoid failing a stall timeout, we'll insist that
+	// no new transactions start while a transaction on the other side
+	// is in process
+	always @(*)
+	if (axi_arv_arr_flag || f_axi_rd_outstanding)
+		assume(!S_AXI_AWVALID && !S_AXI_WVALID);
+	always @(*)
+	if (axi_awv_awr_flag || f_axi_awr_nbursts)
+		assume(!S_AXI_ARVALID && !S_AXI_RVALID);
+
+
 `endif
 // User logic ends
 endmodule

@@ -106,15 +106,17 @@ module faxi_slave #(
 	input	wire			i_axi_rlast,    // Read last
 	input	wire			i_axi_rready,  // Read Response ready
 	//
+	output	reg	[F_LGDEPTH-1:0]		f_axi_awr_nbursts,
+	output	reg	[9-1:0]			f_axi_wr_pending,
 	output	reg	[F_LGDEPTH-1:0]		f_axi_rd_nbursts,
 	output	reg	[F_LGDEPTH-1:0]		f_axi_rd_outstanding,
-	output	reg	[F_LGDEPTH-1:0]		f_axi_wr_nbursts,
-	output	reg	[F_LGDEPTH-1:0]		f_axi_awr_outstanding,
-	output	reg	[F_LGDEPTH-1:0]		f_axi_awr_nbursts,
 		// Address writes without write valids
 	//
-	// output	reg	[(9-1):0]	f_axi_wr_pending,
-	// 
+	// WR_COUNT:
+	output	reg	[C_AXI_ID_WIDTH-1:0]	f_axi_wr_checkid,
+	output	reg				f_axi_wr_ckvalid,
+	output	reg	[F_LGDEPTH-1:0]		f_axi_wrid_nbursts,
+	//
 	// RD_COUNT: increment on read w/o last, cleared on read w/ last
 	output reg	[C_AXI_ID_WIDTH-1:0]	f_axi_rd_checkid,
 	output reg			    	f_axi_rd_ckvalid,
@@ -265,7 +267,7 @@ module faxi_slave #(
 		begin
 			`SLAVE_ASSUME(i_axi_awvalid);
 			`SLAVE_ASSUME(i_axi_awaddr  == $past(i_axi_awaddr));
-			// `SLAVE_ASSUME($stable(i_axi_awid));
+			`SLAVE_ASSUME($stable(i_axi_awid));
 			`SLAVE_ASSUME($stable(i_axi_awlen));
 			`SLAVE_ASSUME($stable(i_axi_awsize));
 			`SLAVE_ASSUME($stable(i_axi_awburst));
@@ -288,7 +290,7 @@ module faxi_slave #(
 		if ((f_past_valid)&&($past(i_axi_arvalid))&&(!$past(i_axi_arready)))
 		begin
 			`SLAVE_ASSUME(i_axi_arvalid);
-			// `SLAVE_ASSUME($stable(i_axi_arid));
+			`SLAVE_ASSUME($stable(i_axi_arid));
 			`SLAVE_ASSUME($stable(i_axi_araddr));
 			`SLAVE_ASSUME($stable(i_axi_arlen));
 			`SLAVE_ASSUME($stable(i_axi_arsize));
@@ -360,19 +362,19 @@ module faxi_slave #(
 		// AXI write data channel
 		//
 		//
-		// AXI explicitly allows write bursts with zero strobes.  This is part
-		// of how a transaction is aborted (if at all).
+		// AXI explicitly allows write bursts with zero strobes.  This
+		// is part of how a transaction is aborted (if at all).
 
 		initial	f_axi_wstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_wvalid)||(i_axi_wready)
-				||(i_axi_bvalid))
+				||(f_axi_wr_pending == 0))
 			f_axi_wstall <= 0;
 		else if ((!i_axi_bvalid)||(i_axi_bready))
 			f_axi_wstall <= f_axi_wstall + 1'b1;
 
 		always @(*)
-			`SLAVE_ASSERT(f_axi_wstall < F_AXI_MAXWAIT);
+			`SLAVE_ASSUME(f_axi_wstall < F_AXI_MAXWAIT);
 
 		//
 		// AXI read address channel
@@ -422,15 +424,57 @@ module faxi_slave #(
 	//
 	//
 	////////////////////////////////////////////////////////////////////////
-	initial	f_axi_awr_outstanding = 0;
+	(* anyconst *)	reg	[C_AXI_ID_WIDTH-1:0]	r_axi_wr_checkid;
+	always @(*)
+		f_axi_wr_checkid = r_axi_wr_checkid;
+
+	initial	f_axi_wr_pending = 0;
+	initial	f_axi_wr_ckvalid = 0;
 	always @(posedge i_clk)
 	if (!i_axi_reset_n)
-		f_axi_awr_outstanding <= 0;
-	else case({ (axi_awr_req), (axi_wr_req) })
-		2'b10: f_axi_awr_outstanding <= f_axi_awr_outstanding + i_axi_awlen+1;
-		2'b01: f_axi_awr_outstanding <= f_axi_awr_outstanding - 1'b1;
-		2'b11: f_axi_awr_outstanding <= f_axi_awr_outstanding + i_axi_awlen; // +1 -1
-		default: begin end
+	begin
+		f_axi_wr_pending <= 0;
+		f_axi_wr_ckvalid <= 0;
+	end else case({ axi_awr_req, axi_wr_req })
+	2'b10: begin
+		f_axi_wr_pending <= i_axi_awlen+1;
+		f_axi_wr_ckvalid <= (i_axi_awid == f_axi_wr_checkid);
+		end
+	2'b01: begin
+		`SLAVE_ASSUME(f_axi_wr_pending > 0);
+		f_axi_wr_pending <= f_axi_wr_pending - 1'b1;
+		`SLAVE_ASSUME(!i_axi_wlast || (f_axi_wr_pending == 1));
+		if (i_axi_wlast)
+			f_axi_wr_ckvalid <= 0;
+		end
+	2'b11: begin
+		f_axi_wr_ckvalid <= (i_axi_awid == f_axi_wr_checkid);
+		if (f_axi_wr_pending > 0)
+			f_axi_wr_pending <= i_axi_awlen+1;
+		else begin
+			f_axi_wr_pending <= i_axi_awlen;
+			f_axi_wr_ckvalid <= 0;
+		end end
+	default: begin end
+	endcase
+
+	always @(*)
+	case({i_axi_awvalid, i_axi_wvalid})
+	2'b10: `SLAVE_ASSUME(f_axi_wr_pending == 0);
+	2'b01: begin
+		`SLAVE_ASSUME(f_axi_wr_pending > 0);
+		`SLAVE_ASSUME(i_axi_wlast == (f_axi_wr_pending == 1));
+		end
+	2'b11: begin
+		if (f_axi_wr_pending > 0)
+		begin // Write word applies to the last burst
+			`SLAVE_ASSUME(f_axi_wr_pending == 1);
+			`SLAVE_ASSUME(i_axi_wlast);
+			`SLAVE_ASSUME(axi_wr_req);
+		end else begin
+			`SLAVE_ASSUME(i_axi_wlast == (i_axi_awlen == 0));
+		end end
+	default: begin end
 	endcase
 
 	initial	f_axi_awr_nbursts = 0;
@@ -443,13 +487,14 @@ module faxi_slave #(
 	default: begin end
 	endcase
 
-	initial	f_axi_wr_nbursts = 0;
+	initial	f_axi_wrid_nbursts = 0;
 	always @(posedge i_clk)
 	if (!i_axi_reset_n)
-		f_axi_wr_nbursts <= 0;
-	else case({ (axi_wr_req)&&(i_axi_wlast), (axi_wr_ack) })
-	2'b01: f_axi_wr_nbursts <= f_axi_wr_nbursts - 1'b1;
-	2'b10: f_axi_wr_nbursts <= f_axi_wr_nbursts + 1'b1;
+		f_axi_wrid_nbursts <= 0;
+	else case({ (axi_awr_req)&&(i_axi_awid==f_axi_wr_checkid),
+			(axi_wr_ack)&&(i_axi_bid == f_axi_wr_checkid) })
+	2'b10: f_axi_wrid_nbursts <= f_axi_wrid_nbursts + 1'b1;
+	2'b01: f_axi_wrid_nbursts <= f_axi_wrid_nbursts - 1'b1;
 	default: begin end
 	endcase
 
@@ -474,31 +519,30 @@ module faxi_slave #(
 
 	// Do not let the number of outstanding requests overflow
 	always @(posedge i_clk)
-		`SLAVE_ASSERT(f_axi_awr_outstanding < {(F_LGDEPTH){1'b1}});
-	always @(posedge i_clk)
 		`SLAVE_ASSERT(f_axi_rd_outstanding  < {(F_LGDEPTH){1'b1}});
 	always @(posedge i_clk)
 		`SLAVE_ASSERT(f_axi_awr_nbursts < {(F_LGDEPTH){1'b1}});
 	always @(posedge i_clk)
-		`SLAVE_ASSERT(f_axi_wr_nbursts  < {(F_LGDEPTH){1'b1}});
+		`SLAVE_ASSERT(f_axi_wr_pending <= 256);
 	always @(posedge i_clk)
 		`SLAVE_ASSERT(f_axi_rd_nbursts  < {(F_LGDEPTH){1'b1}});
 
 	// Cannot have outstanding values if there aren't any outstanding
 	// bursts
 	always @(posedge i_clk)
-	if (f_axi_awr_outstanding > 0)
-		`SLAVE_ASSERT(f_axi_awr_nbursts > 0);
-	// else if (f_axi_awr_outstanding == 0)
-	//	Doesn't apply.  Might have awr_outstanding == 0 and
-	//	awr_nbursts>0
+		assert(f_axi_wrid_nbursts <= f_axi_awr_nbursts);
 	always @(posedge i_clk)
-	if (f_axi_rd_outstanding > 0)
-		`SLAVE_ASSERT(f_axi_rd_nbursts > 0);
-	else
-		`SLAVE_ASSERT(f_axi_rd_nbursts == 0);
+	if (f_axi_awr_nbursts == 0)
+		`SLAVE_ASSERT(f_axi_wr_pending == 0);
 	always @(posedge i_clk)
-		`SLAVE_ASSERT(f_axi_rd_nbursts <= f_axi_rd_outstanding);
+	if (f_axi_wr_pending == 0)
+		assert(f_axi_wr_ckvalid == 0);
+	//
+	//
+	always @(posedge i_clk)
+		assert((f_axi_rd_nbursts == 0)==(f_axi_rd_outstanding==0));
+	always @(posedge i_clk)
+		assert(f_axi_rd_nbursts <= f_axi_rd_outstanding);
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -513,8 +557,7 @@ module faxi_slave #(
 	generate if (F_AXI_MAXDELAY > 0)
 	begin : CHECK_MAX_DELAY
 
-		reg	[(F_LGDEPTH-1):0]	f_axi_wr_ack_delay,
-						f_axi_awr_ack_delay,
+		reg	[(F_LGDEPTH-1):0]	f_axi_awr_ack_delay,
 						f_axi_rd_ack_delay;
 
 		initial	f_axi_rd_ack_delay = 0;
@@ -524,28 +567,18 @@ module faxi_slave #(
 		else
 			f_axi_rd_ack_delay <= f_axi_rd_ack_delay + 1'b1;
 
-		initial	f_axi_wr_ack_delay = 0;
-		always @(posedge i_clk)
-		if ((!i_axi_reset_n)||((i_axi_wvalid)&&(!i_axi_wlast))
-				||(i_axi_bvalid)||(f_axi_awr_outstanding==0))
-			f_axi_wr_ack_delay <= 0;
-		else
-			f_axi_wr_ack_delay <= f_axi_wr_ack_delay + 1'b1;
-
 		initial	f_axi_awr_ack_delay = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(i_axi_bvalid)||(i_axi_wvalid)
-					||(f_axi_awr_nbursts == 0)
-					||(f_axi_wr_nbursts == 0))
+					||((f_axi_awr_nbursts == 1)
+						&&(f_axi_wr_pending>0))
+					||(f_axi_awr_nbursts == 0))
 			f_axi_awr_ack_delay <= 0;
 		else
 			f_axi_awr_ack_delay <= f_axi_awr_ack_delay + 1'b1;
 
 		always @(*)
 			`SLAVE_ASSERT(f_axi_rd_ack_delay < F_AXI_MAXDELAY);
-
-		always @(*)
-			`SLAVE_ASSERT(f_axi_wr_ack_delay < F_AXI_MAXDELAY);
 
 		always @(posedge i_clk)
 			`SLAVE_ASSERT(f_axi_awr_ack_delay < F_AXI_MAXDELAY);
@@ -571,7 +604,11 @@ module faxi_slave #(
 	if (i_axi_bvalid)
 	begin
 		`SLAVE_ASSERT(f_axi_awr_nbursts > 0);
-		`SLAVE_ASSERT(f_axi_wr_nbursts > 0);
+		`SLAVE_ASSERT(f_axi_awr_nbursts > 1 || f_axi_wr_pending == 0);
+		if (f_axi_wrid_nbursts == 0)
+			`SLAVE_ASSERT(i_axi_bid != f_axi_wr_checkid);
+		else if ((f_axi_wrid_nbursts == 1)&&(f_axi_wr_ckvalid))
+			`SLAVE_ASSERT(i_axi_bid != f_axi_wr_checkid);
 	end
 
 	//
@@ -591,13 +628,10 @@ module faxi_slave #(
 	// Xilinx extensions
 	//
 	////////////////////////////////////////////////////////////////////////
-	always @(posedge i_clk)
-	if (f_axi_wr_nbursts > 0)
-		`SLAVE_ASSUME(i_axi_wvalid);
 
 	////////////////////////////////////////////////////////////////////////
 	//
-	//
+	// Option for no bursts, only single transactions
 	//
 	////////////////////////////////////////////////////////////////////////
 
