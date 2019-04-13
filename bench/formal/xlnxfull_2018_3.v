@@ -244,8 +244,6 @@ module xlnxfull_2018_3 #(
 	// S_AXI_AWVALID and S_AXI_WVALID are asserted. axi_awready is
 	// de-asserted when reset is low.
 
-	initial	axi_awready = 1'b0;
-	initial	axi_awv_awr_flag = 1'b0;
 	always @( posedge S_AXI_ACLK )
 	begin
 	  if ( S_AXI_ARESETN == 1'b0 )
@@ -279,10 +277,6 @@ module xlnxfull_2018_3 #(
 	// This process is used to latch the address when both
 	// S_AXI_AWVALID and S_AXI_WVALID are valid.
 
-	initial	axi_awaddr     = 0;
-	initial	axi_awlen_cntr = 0;
-	initial	axi_awburst    = 0;
-	initial	axi_awlen      = 0;
 	always @( posedge S_AXI_ACLK )
 	begin
 	  if ( S_AXI_ARESETN == 1'b0 )
@@ -349,7 +343,6 @@ module xlnxfull_2018_3 #(
 	// S_AXI_AWVALID and S_AXI_WVALID are asserted. axi_wready is
 	// de-asserted when reset is low.
 
-	initial	axi_wready = 1'b0;
 	always @( posedge S_AXI_ACLK )
 	begin
 	  if ( S_AXI_ARESETN == 1'b0 )
@@ -377,9 +370,6 @@ module xlnxfull_2018_3 #(
 	// This marks the acceptance of address and indicates the status of
 	// write transaction.
 
-	initial	axi_bvalid = 1'b0;
-	initial	axi_bresp  = 1'b0;
-//	initial	axi_buser  = 1'b0;
 	always @( posedge S_AXI_ACLK )
 	begin
 	  if ( S_AXI_ARESETN == 1'b0 )
@@ -415,8 +405,6 @@ module xlnxfull_2018_3 #(
 	// The read address is also latched when S_AXI_ARVALID is
 	// asserted. axi_araddr is reset to zero on reset assertion.
 
-	initial	axi_arready      = 1'b0;
-	initial	axi_arv_arr_flag = 1'b0;
 	always @( posedge S_AXI_ACLK )
 	begin
 	  if ( S_AXI_ARESETN == 1'b0 )
@@ -446,12 +434,6 @@ module xlnxfull_2018_3 #(
 
 	//This process is used to latch the address when both 
 	//S_AXI_ARVALID and S_AXI_RVALID are valid. 
-	initial	axi_araddr = 0;
-	initial	axi_arlen_cntr = 0;
-	initial	axi_arburst    = 0;
-	initial	axi_arlen      = 0;
-	initial	axi_rlast      = 0;
-//	initial	axi_ruser      = 0;
 	always @( posedge S_AXI_ACLK )
 	begin
 	  if ( S_AXI_ARESETN == 1'b0 )
@@ -535,8 +517,6 @@ module xlnxfull_2018_3 #(
 	// is deasserted on reset (active low). axi_rresp and axi_rdata are 
 	// cleared to zero on reset (active low).  
 
-	initial	axi_rvalid = 1'b0;
-	initial	axi_rresp  = 1'b0;
 	always @( posedge S_AXI_ACLK )
 	begin
 	  if ( S_AXI_ARESETN == 1'b0 )
@@ -626,7 +606,27 @@ module xlnxfull_2018_3 #(
 	    end       
 	end    
 
-// Add user logic here
+// Verification logic starts here:
+	initial	axi_awready = 1'b0;
+	initial	axi_awv_awr_flag = 1'b0;
+	initial	axi_awaddr     = 0;
+	initial	axi_awlen_cntr = 0;
+	initial	axi_awburst    = 0;
+	initial	axi_awlen      = 0;
+	initial	axi_wready = 1'b0;
+	initial	axi_bvalid = 1'b0;
+	initial	axi_bresp  = 1'b0;
+//	initial	axi_buser  = 1'b0;
+	initial	axi_arready      = 1'b0;
+	initial	axi_arv_arr_flag = 1'b0;
+	initial	axi_araddr = 0;
+	initial	axi_arlen_cntr = 0;
+	initial	axi_arburst    = 0;
+	initial	axi_arlen      = 0;
+	initial	axi_rlast      = 0;
+//	initial	axi_ruser      = 0;
+	initial	axi_rvalid = 1'b0;
+	initial	axi_rresp  = 1'b0;
 `ifdef	FORMAL
 	localparam	F_LGDEPTH=10;
 
@@ -639,9 +639,20 @@ module xlnxfull_2018_3 #(
 	wire	[F_LGDEPTH-1:0]		f_axi_wrid_nbursts;
 
 	//
+	wire	[C_S_AXI_ADDR_WIDTH-1:0] f_axi_wr_addr;
+	wire	[7:0]			f_axi_wr_incr;
+	wire	[1:0]			f_axi_wr_burst;
+	wire	[2:0]			f_axi_wr_size;
+	wire	[7:0]			f_axi_wr_len;
+	//
 	wire	[C_S_AXI_ID_WIDTH-1:0]	f_axi_rd_checkid;
 	wire				f_axi_rd_ckvalid;
 	wire	[9-1:0]			f_axi_rd_cklen;
+	wire	[C_S_AXI_ADDR_WIDTH-1:0] f_axi_rd_ckaddr;
+	wire	[7:0]			f_axi_rd_ckincr;
+	wire	[1:0]			f_axi_rd_ckburst;
+	wire	[2:0]			f_axi_rd_cksize;
+	wire	[7:0]			f_axi_rd_ckarlen;
 	wire	[F_LGDEPTH-1:0]		f_axi_rdid_nbursts,
 					f_axi_rdid_outstanding,
 					f_axi_rdid_ckign_nbursts,
@@ -652,6 +663,8 @@ module xlnxfull_2018_3 #(
 		.C_AXI_ID_WIDTH(C_S_AXI_ID_WIDTH),
 		.C_AXI_DATA_WIDTH(C_S_AXI_DATA_WIDTH),
 		.C_AXI_ADDR_WIDTH(C_S_AXI_ADDR_WIDTH),
+		.OPT_NARROW_BURST(1),
+		.OPT_EXCLUSIVE(0),
 		.F_LGDEPTH(F_LGDEPTH))
 		f_slave(
 		.i_clk(S_AXI_ACLK),
@@ -797,10 +810,20 @@ module xlnxfull_2018_3 #(
 		.f_axi_wr_checkid(f_axi_wr_checkid),
 		.f_axi_wr_ckvalid(f_axi_wr_ckvalid),
 		.f_axi_wrid_nbursts(f_axi_wrid_nbursts),
+		.f_axi_wr_addr(f_axi_wr_addr),
+		.f_axi_wr_incr(f_axi_wr_incr),
+		.f_axi_wr_burst(f_axi_wr_burst),
+		.f_axi_wr_size(f_axi_wr_size),
+		.f_axi_wr_len(f_axi_wr_len),
 		//
 		.f_axi_rd_checkid(f_axi_rd_checkid),
 		.f_axi_rd_ckvalid(f_axi_rd_ckvalid),
 		.f_axi_rd_cklen(f_axi_rd_cklen),
+		.f_axi_rd_ckaddr(f_axi_rd_ckaddr),
+		.f_axi_rd_ckincr(f_axi_rd_ckincr),
+		.f_axi_rd_ckburst(f_axi_rd_ckburst),
+		.f_axi_rd_cksize(f_axi_rd_cksize),
+		.f_axi_rd_ckarlen(f_axi_rd_ckarlen),
 		.f_axi_rdid_nbursts(f_axi_rdid_nbursts),
 		.f_axi_rdid_outstanding(f_axi_rdid_outstanding),
 		.f_axi_rdid_ckign_nbursts(f_axi_rdid_ckign_nbursts),
@@ -875,6 +898,18 @@ module xlnxfull_2018_3 #(
 	always @(*)
 	if (f_axi_awr_nbursts > 0)
 		assert(axi_awv_awr_flag || S_AXI_BVALID);
+	always @(*)
+	if (f_axi_wr_pending > 0)
+		assert(axi_awaddr == f_axi_wr_addr);
+	always @(*)
+	if (f_axi_wr_pending > 0)
+		assert(axi_awburst == f_axi_wr_burst);
+	always @(*)
+	if (axi_arv_arr_flag || !axi_awv_awr_flag)
+		assert(!S_AXI_WREADY);
+	always @(*)
+	if (f_axi_wr_pending)
+		assert(axi_awlen == f_axi_wr_len);
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -883,16 +918,16 @@ module xlnxfull_2018_3 #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+	reg	[C_S_AXI_ADDR_WIDTH-1:0]	f_mem_rdaddr;
+	wire	[C_S_AXI_ADDR_WIDTH-1:0]	next_rd_addr;
+	wire	[7:0]				next_rd_incr;
+
 	always @(*)
 		assert((f_axi_rdid_nbursts == 0)
 				||(f_axi_rdid_nbursts == f_axi_rd_nbursts));
 	always @(*)
 		assert((f_axi_rdid_outstanding == 0)
 				||(f_axi_rdid_outstanding==f_axi_rd_outstanding));
-	always @(posedge S_AXI_ACLK)
-	if (f_axi_rdid_outstanding > 0)
-		assume(($stable(S_AXI_ARID))&&(S_AXI_ARID == f_axi_rd_checkid));
-
 	always @(*)
 		assert(f_axi_rd_nbursts <= 1);
 	always @(*)
@@ -905,11 +940,43 @@ module xlnxfull_2018_3 #(
 		assert(f_axi_rd_outstanding == 0);
 	always @(*)
 		assert(axi_arlen_cntr <= axi_arlen+1);
+	always @(posedge S_AXI_ACLK)
+		f_mem_rdaddr <= axi_araddr;
+
+	faxi_addr #(.AW(C_S_AXI_ADDR_WIDTH))
+		get_next_rdaddr(f_mem_rdaddr, 3'b010,
+			axi_arburst, axi_arlen,
+			next_rd_incr, next_rd_addr);
+
+	always @(posedge S_AXI_ACLK)
+		assert(axi_arburst != 2'b11);
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN && f_axi_rd_ckvalid && f_axi_rdid_ckign_nbursts==0)
+	begin
+		if (!$past(S_AXI_RVALID && S_AXI_RREADY))
+			assert(f_mem_rdaddr == axi_araddr);
+		else
+			assert(next_rd_addr == axi_araddr);
+		if (axi_arburst == 0)
+			assert(f_mem_rdaddr == axi_araddr);
+
+		if (S_AXI_RVALID)
+			assert(f_axi_rd_ckaddr == f_mem_rdaddr);
+	end
+
+	always @(*)
+	if (f_axi_rd_ckvalid)
+	begin
+		assert(axi_arlen== f_axi_rd_ckarlen);
+		assert(axi_arburst== f_axi_rd_ckburst);
+	end
 	always @(*)
 	if (S_AXI_RVALID && S_AXI_RID == f_axi_rd_checkid)
 	begin
 		assert(f_axi_rdid_nbursts == f_axi_rd_nbursts);
 		assert(f_axi_rdid_outstanding == f_axi_rd_outstanding);
+		if (f_axi_rd_ckvalid)
+			assert(f_axi_rd_ckaddr == f_mem_rdaddr);
 	end
 
 	reg	[8:0]	f_rpending;
@@ -957,8 +1024,13 @@ module xlnxfull_2018_3 #(
 	//
 	////////////////////////////////////////////////////////////////////////
 	//
+	//
+	// BUG #1: The ID inputs, both ARID and AWID, are not registered.
+	// 	As a result, if the master changes these values mid burst,
+	//	the slave will return the wrong ID values
 	always @(*)
-		assume(S_AXI_ARID == 0);
+		assume((S_AXI_ARID == f_axi_rd_checkid)
+			==(f_axi_rdid_nbursts > 0));
 
 	always @(*)
 	if (f_axi_wr_pending > 0)
@@ -966,20 +1038,30 @@ module xlnxfull_2018_3 #(
 	always @(*)
 	if (f_axi_awr_nbursts > 0)
 		assume((f_axi_wrid_nbursts>0) == (S_AXI_AWID == f_axi_wr_checkid));
+
+	//
+	// BUG #2: This core using the S_AXI_WLAST signal, without first
+	//	checking that S_AXI_WVALID is also true.  Hence, if there's any
+	//	time between WVALIDs, the core might act on the last one
+	//	without receiving the data
 	always @(*)
 	if (S_AXI_WLAST)
 		assume(S_AXI_WVALID);
-	always @(*)
-	if (S_AXI_BVALID)
-		assume(S_AXI_BREADY);
-	always @(*)
-	if (S_AXI_BVALID)
-		assume(!S_AXI_AWVALID);
 
-	// This particular core can't handle both reads and writes at the
-	// same time.  To avoid failing a stall timeout, we'll insist that
-	// no new transactions start while a transaction on the other side
-	// is in process
+	//
+	// BUG #3: Like Xilinx's AXI-lite core, this core can't handle back
+	//	pressure.  Should S_AXI_BREADY not be accepted before the next
+	//	S_AXI_AWVALID & S_AXI_AWREADY, a burst would be dropped
+	//
+	always @(*)
+	if (S_AXI_BVALID)
+		assume(S_AXI_BREADY || !S_AXI_AWREADY);
+
+	//
+	// BAD PRACTICE: This particular core can't handle both reads and
+	//	writes at the same time.  To avoid failing a stall timeout,
+	//	we'll insist that no new transactions start while a
+	//	transaction on the other side is in process
 	always @(*)
 	if (axi_arv_arr_flag || f_axi_rd_outstanding)
 		assume(!S_AXI_AWVALID && !S_AXI_WVALID);
@@ -987,7 +1069,36 @@ module xlnxfull_2018_3 #(
 	if (axi_awv_awr_flag || f_axi_awr_nbursts)
 		assume(!S_AXI_ARVALID && !S_AXI_RVALID);
 
-
+//
+// Comments:
+//
+//	- ID's are broken.  The ID should be registered and recorded within the
+//	    core, allowing the interconnect to change them after the transaction
+//	    has been accepted
+//
+//	- This core does not support narrow burst mode, but rather only
+//	    supports an AxSIZE of 2'b10 (32'bit bus).  It cannot handle busses
+//	    of other sizes, or transactions from smaller sources.
+//
+//		This might be considered a "feature"
+//
+//	- This core can only handle read or write transactions, but never both
+//	    at the same time
+//
+//		This might also be considered a "feature"
+//
+//	- The wrap logic depends upon a multiply
+//
+//		A good synthesis tool might simplify this
+//
+//	- Read transactions take place at one word every other clock at best
+//
+//		This is just plain crippled.
+//
+//	- Any back pressure could easily cause the core to lose a transaction,
+//	    as the newer transaction's response will overwrite the waiting
+//	    response from the previous transaction
+//
 `endif
 // User logic ends
 endmodule

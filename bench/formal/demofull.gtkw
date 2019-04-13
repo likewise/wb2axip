@@ -1,0 +1,179 @@
+[*]
+[*] GTKWave Analyzer v3.3.86 (w)1999-2017 BSI
+[*] Sat Apr 13 10:30:52 2019
+[*]
+[dumpfile] "(null)"
+[savefile] "/home/dan/jericho/work/rnd/opencores/wb2axip/trunk/bench/formal/demofull.gtkw"
+[timestart] 80
+[size] 1920 1021
+[pos] -1 -1
+*-3.733982 150 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 270
+[signals_width] 360
+[sst_expanded] 1
+[sst_vpaned_height] 289
+@28
+demofull.S_AXI_ACLK
+demofull.S_AXI_ARESETN
+@200
+-
+@c00200
+-Slave writes
+@28
+[color] 3
+demofull.S_AXI_AWVALID
+[color] 2
+demofull.S_AXI_AWREADY
+[color] 3
+demofull.S_AXI_AWID
+@22
+[color] 3
+demofull.S_AXI_AWADDR[5:0]
+[color] 3
+demofull.S_AXI_AWLEN[7:0]
+@28
+[color] 3
+demofull.S_AXI_AWBURST[1:0]
+[color] 3
+demofull.S_AXI_AWSIZE[2:0]
+demofull.S_AXI_AWLOCK
+@22
+demofull.S_AXI_AWCACHE[3:0]
+@28
+demofull.S_AXI_AWPROT[2:0]
+@22
+demofull.S_AXI_AWQOS[3:0]
+@200
+-
+@28
+[color] 3
+demofull.S_AXI_WVALID
+[color] 2
+demofull.S_AXI_WREADY
+@22
+[color] 3
+demofull.S_AXI_WDATA[31:0]
+[color] 3
+demofull.S_AXI_WSTRB[3:0]
+@28
+[color] 3
+demofull.S_AXI_WLAST
+@200
+-
+@28
+[color] 2
+demofull.S_AXI_BVALID
+[color] 3
+demofull.S_AXI_BREADY
+[color] 2
+demofull.S_AXI_BID
+[color] 2
+demofull.S_AXI_BRESP[1:0]
+@1401200
+-Slave writes
+@22
+demofull.waddr[5:0]
+@28
+demofull.r_bid
+demofull.axi_bid
+demofull.r_bvalid
+@22
+demofull.f_axi_wr_pending[8:0]
+demofull.f_axi_awr_nbursts[8:0]
+demofull.f_axi_wr_addr[5:0]
+@28
+demofull.f_axi_wr_burst[1:0]
+demofull.f_axi_wr_checkid
+demofull.f_axi_wr_ckvalid
+@22
+demofull.f_axi_wr_incr[7:0]
+demofull.f_axi_wr_len[7:0]
+@28
+demofull.f_axi_wr_size[2:0]
+@22
+demofull.f_axi_wrid_nbursts[8:0]
+@200
+-
+@800200
+-Slave reads
+@28
+[color] 3
+demofull.S_AXI_ARVALID
+[color] 2
+demofull.S_AXI_ARREADY
+[color] 3
+demofull.S_AXI_ARID
+@22
+[color] 3
+demofull.S_AXI_ARADDR[5:0]
+[color] 3
+demofull.S_AXI_ARLEN[7:0]
+@28
+[color] 3
+demofull.S_AXI_ARBURST[1:0]
+[color] 3
+demofull.S_AXI_ARSIZE[2:0]
+demofull.S_AXI_ARLOCK
+@22
+demofull.S_AXI_ARCACHE[3:0]
+@28
+demofull.S_AXI_ARPROT[2:0]
+@22
+demofull.S_AXI_ARQOS[3:0]
+@200
+-
+@28
+[color] 2
+demofull.S_AXI_RVALID
+[color] 3
+demofull.S_AXI_RREADY
+[color] 2
+demofull.S_AXI_RID
+@22
+[color] 2
+demofull.S_AXI_RDATA[31:0]
+@28
+[color] 2
+demofull.S_AXI_RLAST
+[color] 2
+demofull.S_AXI_RRESP[1:0]
+@1000200
+-Slave reads
+@22
+demofull.rlen[7:0]
+demofull.axi_rlen[8:0]
+@28
+demofull.rburst[1:0]
+@200
+-
+@22
+demofull.next_rd_addr[5:0]
+@28
+demofull.o_rd
+@23
+demofull.o_raddr[3:0]
+@22
+demofull.raddr[5:0]
+demofull.f_mem_rdaddr[5:0]
+@28
+demofull.f_axi_rd_checkid
+@22
+demofull.f_axi_rd_ckaddr[5:0]
+demofull.f_axi_rd_ckarlen[7:0]
+@28
+demofull.f_axi_rd_ckburst[1:0]
+@22
+demofull.f_axi_rd_ckincr[7:0]
+demofull.f_axi_rd_cklen[8:0]
+@28
+demofull.f_axi_rd_cksize[2:0]
+demofull.f_axi_rd_ckvalid
+@22
+demofull.f_axi_rd_nbursts[8:0]
+demofull.f_axi_rd_outstanding[8:0]
+demofull.f_axi_rdid_ckign_nbursts[8:0]
+demofull.f_axi_rdid_ckign_outstanding[8:0]
+demofull.f_axi_rdid_nbursts[8:0]
+demofull.f_axi_rdid_outstanding[8:0]
+[pattern_trace] 1
+[pattern_trace] 0

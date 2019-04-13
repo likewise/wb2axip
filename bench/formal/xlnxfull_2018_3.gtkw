@@ -1,0 +1,125 @@
+[*]
+[*] GTKWave Analyzer v3.3.86 (w)1999-2017 BSI
+[*] Sun Mar 24 02:05:44 2019
+[*]
+[dumpfile] "(null)"
+[savefile] "/home/dan/jericho/work/rnd/opencores/wb2axip/trunk/bench/formal/xlnxfull_2018_3.gtkw"
+[timestart] 13
+[size] 1816 972
+[pos] -817 -1
+*-5.054117 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] xlnxfull_2018_3.
+[sst_width] 270
+[signals_width] 360
+[sst_expanded] 1
+[sst_vpaned_height] 273
+@28
+xlnxfull_2018_3.S_AXI_ARESETN
+xlnxfull_2018_3.S_AXI_ACLK
+@200
+-
+@28
+xlnxfull_2018_3.S_AXI_AWVALID
+xlnxfull_2018_3.S_AXI_AWREADY
+@22
+xlnxfull_2018_3.S_AXI_AWADDR[5:0]
+@28
+xlnxfull_2018_3.S_AXI_AWBURST[1:0]
+@22
+xlnxfull_2018_3.S_AXI_AWCACHE[3:0]
+@28
+xlnxfull_2018_3.S_AXI_AWID
+@22
+xlnxfull_2018_3.S_AXI_AWLEN[7:0]
+@28
+xlnxfull_2018_3.S_AXI_AWLOCK
+xlnxfull_2018_3.S_AXI_AWPROT[2:0]
+@22
+xlnxfull_2018_3.S_AXI_AWQOS[3:0]
+xlnxfull_2018_3.S_AXI_AWREGION[3:0]
+@28
+xlnxfull_2018_3.S_AXI_AWSIZE[2:0]
+@200
+-
+@28
+xlnxfull_2018_3.S_AXI_WVALID
+xlnxfull_2018_3.S_AXI_WREADY
+xlnxfull_2018_3.S_AXI_WLAST
+@22
+xlnxfull_2018_3.S_AXI_WDATA[31:0]
+xlnxfull_2018_3.S_AXI_WSTRB[3:0]
+@200
+-
+@28
+xlnxfull_2018_3.S_AXI_BVALID
+xlnxfull_2018_3.S_AXI_BID
+xlnxfull_2018_3.S_AXI_BREADY
+xlnxfull_2018_3.S_AXI_BRESP[1:0]
+@200
+-
+@28
+[color] 3
+xlnxfull_2018_3.S_AXI_ARVALID
+[color] 2
+xlnxfull_2018_3.S_AXI_ARREADY
+@22
+[color] 3
+xlnxfull_2018_3.S_AXI_ARADDR[5:0]
+@28
+[color] 3
+xlnxfull_2018_3.S_AXI_ARBURST[1:0]
+@22
+[color] 3
+xlnxfull_2018_3.S_AXI_ARCACHE[3:0]
+@28
+[color] 3
+xlnxfull_2018_3.S_AXI_ARID
+@22
+[color] 3
+xlnxfull_2018_3.S_AXI_ARLEN[7:0]
+@28
+[color] 3
+xlnxfull_2018_3.S_AXI_ARLOCK
+[color] 3
+xlnxfull_2018_3.S_AXI_ARPROT[2:0]
+@22
+[color] 3
+xlnxfull_2018_3.S_AXI_ARQOS[3:0]
+@28
+[color] 3
+xlnxfull_2018_3.S_AXI_ARSIZE[2:0]
+@200
+-
+@28
+[color] 2
+xlnxfull_2018_3.S_AXI_RVALID
+[color] 3
+xlnxfull_2018_3.S_AXI_RREADY
+[color] 2
+xlnxfull_2018_3.S_AXI_RLAST
+[color] 2
+xlnxfull_2018_3.S_AXI_RID
+@22
+[color] 2
+xlnxfull_2018_3.S_AXI_RDATA[31:0]
+@28
+[color] 2
+xlnxfull_2018_3.S_AXI_RRESP[1:0]
+@200
+-
+@28
+xlnxfull_2018_3.f_axi_rd_checkid
+@22
+xlnxfull_2018_3.f_axi_rd_cklen[8:0]
+@28
+xlnxfull_2018_3.f_axi_rd_ckvalid
+@23
+xlnxfull_2018_3.f_axi_rd_nbursts[9:0]
+@22
+xlnxfull_2018_3.f_axi_rd_outstanding[9:0]
+xlnxfull_2018_3.f_axi_rdid_ckign_nbursts[9:0]
+xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+xlnxfull_2018_3.f_axi_rdid_nbursts[9:0]
+xlnxfull_2018_3.f_axi_rdid_outstanding[9:0]
+[pattern_trace] 1
+[pattern_trace] 0

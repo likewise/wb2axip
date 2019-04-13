@@ -1,0 +1,56 @@
+[tasks]
+cvr
+prf8	prf	dw8
+prf16	prf	dw16
+prf		dw32
+prf64	prf	dw64
+prf128	prf	dw128
+prf256	prf	dw256
+# prf512	prf	dw512
+# prf1024	prf	dw1024
+prfn8	prf	dw8    opt_narrow_burst
+prfn16	prf	dw16   opt_narrow_burst
+prfn	prf	dw32   opt_narrow_burst
+prfn64	prf	dw64   opt_narrow_burst
+prfn128	prf	dw128  opt_narrow_burst
+prfn256	prf	dw256  opt_narrow_burst
+# prfn512	prf	dw512  opt_narrow_burst
+# prfn1024 prf	dw1024 opt_narrow_burst
+prfw	prf	dw32                 awide 
+prfnw	prf	dw32 opt_narrow_bus  awide
+# Still need to check OPT_EXCLUSIVE
+
+[options]
+cvr: mode cover
+cvr: depth 60
+prf: mode prove
+prf: depth 15
+append 0
+
+[engines]
+smtbmc boolector
+# smtbmc z3
+# abc bmc3
+
+[script]
+read -formal demofull.v
+read -formal faxi_slave.v
+read -formal faxi_addr.v
+dw8:    chparam -set C_S_AXI_DATA_WIDTH    8 demofull
+dw16:   chparam -set C_S_AXI_DATA_WIDTH   16 demofull
+dw32:   chparam -set C_S_AXI_DATA_WIDTH   32 demofull
+dw64:   chparam -set C_S_AXI_DATA_WIDTH   64 demofull
+dw128:  chparam -set C_S_AXI_DATA_WIDTH  128 demofull
+dw256:  chparam -set C_S_AXI_DATA_WIDTH  256 demofull
+# dw512:  chparam -set C_S_AXI_DATA_WIDTH  512 demofull
+# dw1024: chparam -set C_S_AXI_DATA_WIDTH 1024 demofull
+~opt_narrow_burst: chparam -set OPT_NARROW_BURST 0 demofull
+opt_narrow_burst:  chparam -set OPT_NARROW_BURST 1 demofull
+~awide: chparam -set C_S_AXI_ADDR_WIDTH 6 demofull
+awide: chparam -set C_S_AXI_ADDR_WIDTH 16 demofull
+prep -top demofull
+
+[files]
+../../rtl/demofull.v
+faxi_slave.v
+faxi_addr.v

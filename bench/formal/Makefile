@@ -42,7 +42,7 @@
 ################################################################################
 ##
 ##
-TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar axilxbar # wbm2axisp axim2wbsp
+TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar axilxbar demofull xlnxfull # wbm2axisp axim2wbsp
 .PHONY: $(TESTS)
 all: $(TESTS)
 RTL := ../../rtl
@@ -63,13 +63,16 @@ RDLITE     := axilrd2wbsp
 WRLITE     := axilwr2wbsp
 AXLITE     := axlite2wbsp
 XILINXDEMO := xlnxdemo
+XILINXFULL := xlnxfull_2018_3
 AXILXBAR   := axilxbar
 WBXBAR     := wbxbar
 WBXBAR4x8  := wbxbar4x8
 WBXBAR1x8  := wbxbar1x8
 WBXBAR4x1  := wbxbar4x1
+DEMOFULL   := demofull
 AXIL       := faxil_master.v faxil_slave.v
 WB         := fwb_master.v fwb_slave.v
+AXI        := faxi_master.v faxi_slave.v
 
 .PHONY: $(WBARB) $(WB2AXI) $(RDLITE) $(WRLITE) $(AXLITE) $(WB2LITE) $(DEMOAXI)
 
@@ -131,6 +134,14 @@ $(XILINXDEMO)_prf/PASS: $(XILINXDEMO).v $(XILINXDEMO).sby faxil_slave.v
 	sby -f $(XILINXDEMO).sby prf
 $(XILINXDEMO)_cvr/PASS: $(XILINXDEMO).v $(XILINXDEMO).sby faxil_slave.v
 	sby -f $(XILINXDEMO).sby cvr
+
+.PHONY: $(XILINXFULL) xlnxfull
+xlnxfull: $(XILINXFULL)
+$(XILINXFULL): $(XILINXFULL)_prf/PASS $(XILINXFULL)_cvr/PASS
+$(XILINXFULL)_prf/PASS: $(XILINXFULL).v $(XILINXFULL).sby $(AXI)
+	sby -f $(XILINXFULL).sby prf
+$(XILINXFULL)_cvr/PASS: $(XILINXFULL).v $(XILINXFULL).sby $(AXI)
+	sby -f $(XILINXFULL).sby cvr
 
 
 .PHONY: $(AXI2WB)
@@ -335,6 +346,12 @@ wbxbar_prf4x1_lpkos/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 $(WBXBAR4x1): wbxbar_prf4x1_cheapkos/PASS
 wbxbar_prf4x1_cheapkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x1_cheapkos
+
+$(DEMOFULL): $(DEMOFULL)_prf/PASS $(DEMOFULL)_cvr/PASS
+$(DEMOFULL)_prf/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prf
+$(DEMOFULL)_cvr/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby cvr
 
 .PHONY: clean
 clean:
