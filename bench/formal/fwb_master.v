@@ -446,5 +446,6 @@ module	fwb_master(i_clk, i_reset,
 		if ((f_past_valid)&&($past(i_wb_cyc))&&(!$past(i_wb_stb)))
 			`SLAVE_ASSUME(!i_wb_stb);
 	end endgenerate
-
+`undef	SLAVE_ASSUME
+`undef	SLAVE_ASSERT
 endmodule

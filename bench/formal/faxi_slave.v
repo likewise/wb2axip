@@ -739,6 +739,18 @@ module faxi_slave #(
 			`SLAVE_ASSERT(i_axi_bid != f_axi_wr_checkid);
 	end
 
+	always @(*)
+	if (f_axi_wrid_nbursts == f_axi_awr_nbursts)
+	begin
+		if (i_axi_bvalid)
+			`SLAVE_ASSERT(i_axi_bid == f_axi_wr_checkid);
+	end
+
+	always @(*)
+	if (f_axi_wrid_nbursts == 0)
+		`SLAVE_ASSERT(!i_axi_bvalid || i_axi_bid != f_axi_wr_checkid);
+
+
 	//
 	// AXI read data channel signals
 	//
@@ -750,6 +762,23 @@ module faxi_slave #(
 		if (!i_axi_rlast)
 			`SLAVE_ASSERT(f_axi_rd_outstanding > 1);
 	end
+
+	always @(*)
+		assert(f_axi_rdid_outstanding <= f_axi_rd_outstanding);
+	always @(*)
+		assert(f_axi_rdid_nbursts <= f_axi_rd_nbursts);
+
+	always @(*)
+	if (f_axi_rdid_nbursts == f_axi_rd_nbursts)
+	begin
+		assert(f_axi_rdid_outstanding == f_axi_rd_outstanding);
+		if (i_axi_rvalid)
+			`SLAVE_ASSERT(i_axi_rid == f_axi_rd_checkid);
+	end
+
+	always @(*)
+	if (f_axi_rdid_nbursts == 0)
+		`SLAVE_ASSERT(!i_axi_rvalid || i_axi_rid != f_axi_rd_checkid);
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -767,7 +796,7 @@ module faxi_slave #(
 			f_axi_wr_len   <= i_axi_awlen;
 		end
 
-		if (OPT_NARROW_BURST)
+		if (!OPT_NARROW_BURST)
 		begin
 			// In this case, all size parameters are fixed.
 			// Let's remove them from the solvers logic choices
@@ -838,27 +867,17 @@ module faxi_slave #(
 
 	generate if (OPT_NARROW_BURST)
 	begin : WR_NARROW_ASSUME
-		reg	[10:0]	size;
-		always @(*)
-		begin
-			size = 0;
-			size[2:0] = i_axi_awsize;
-		end
 
 		always @(*)
 		if (i_axi_awvalid)
-			`SLAVE_ASSUME(DW == (1<<(size + 3)));
+			`SLAVE_ASSUME(DW >= (1<<(i_axi_awsize + 3)));
+
 	end else begin : WR_SZ_ASSUME
-		reg	[10:0]	size;
-		always @(*)
-		begin
-			size = 0;
-			size[2:0] = i_axi_awsize;
-		end
 
 		always @(*)
 		if (i_axi_awvalid)
-			`SLAVE_ASSUME(DW >= (1<<(size + 3)));
+			`SLAVE_ASSUME(DW == (1<<(i_axi_awsize + 3)));
+
 	end endgenerate
 
 
@@ -905,7 +924,6 @@ module faxi_slave #(
 		// the write strobe.  An STRB of 0 is always allowed.
 		//
 		always @(*)
-		if (i_axi_wvalid)
 		begin
 			strb_mask = 1;
 			case(this_awsize)
@@ -931,8 +949,11 @@ module faxi_slave #(
 				strb_mask = strb_mask << f_axi_wr_addr[4:0];
 			if (DW == 512)
 				strb_mask = strb_mask << f_axi_wr_addr[5:0];
+			if (DW == 1024)
+				strb_mask = strb_mask << f_axi_wr_addr[6:0];
 
-			`SLAVE_ASSUME((i_axi_wstrb & ~strb_mask) == 0);
+			if (i_axi_wvalid)
+				`SLAVE_ASSUME((i_axi_wstrb & ~strb_mask) == 0);
 		end
 	end endgenerate
 
@@ -999,14 +1020,17 @@ module faxi_slave #(
 
 	generate if (OPT_NARROW_BURST)
 	begin : WR_NARROW_ASSERT
+
 		always @(*)
 		if (f_axi_wr_pending > 0)
-			assert(DW == (10'h1<<(f_axi_wr_size + 3)));
+			assert(DW >= (1<<(f_axi_wr_size + 3)));
+
 	end else begin : WR_SZ_ASSERT
 
 		always @(*)
 		if (f_axi_wr_pending > 0)
-			assert(DW >= (10'h1<<(f_axi_wr_size + 3)));
+			assert(DW == (1<<(f_axi_wr_size + 3)));
+
 	end endgenerate
 
 
@@ -1017,6 +1041,12 @@ module faxi_slave #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+	wire	check_this_read_burst;
+	assign	check_this_read_burst = (i_axi_reset_n
+				&& !f_axi_rd_ckvalid && f_axi_rd_check
+				&& i_axi_arid == f_axi_rd_checkid
+				&& axi_ard_req);
+
 	always @(*)
 	if (!f_axi_rd_ckvalid || f_axi_rdid_ckign_nbursts != 0)
 		rd_pending = 0;
@@ -1036,9 +1066,7 @@ module faxi_slave #(
 
 	always @(posedge i_clk)
 	begin
-		if (!f_axi_rd_ckvalid && f_axi_rd_check
-				&& i_axi_arid == f_axi_rd_checkid
-				&& axi_ard_req)
+		if (check_this_read_burst)
 		begin
 			f_axi_rd_ckburst <= i_axi_arburst;
 			f_axi_rd_cksize  <= i_axi_arsize;
@@ -1048,7 +1076,7 @@ module faxi_slave #(
 			&&(axi_rd_ack))
 			f_axi_rd_ckaddr <= next_rd_addr;
 
-		if (OPT_NARROW_BURST)
+		if (!OPT_NARROW_BURST)
 		begin
 			// In this case, all size parameters are fixed.
 			// Let's remove them from the solvers logic choices
@@ -1144,15 +1172,15 @@ module faxi_slave #(
 				||(i_axi_arlen == 15));
 	end
 
-	generate if (!OPT_NARROW_BURST)
-	begin
-		always @(*)
-		if (i_axi_arvalid)
-			`SLAVE_ASSUME(DW == (1<<(i_axi_arsize+3)));
-	end else begin
+	generate if (OPT_NARROW_BURST)
+	begin : RD_NARROW_ASSUME
 		always @(*)
 		if (i_axi_arvalid)
 			`SLAVE_ASSUME(DW >= (1<<(i_axi_arsize+3)));
+	end else begin : RD_SZ_ASSUME
+		always @(*)
+		if (i_axi_arvalid)
+			`SLAVE_ASSUME(DW == (1<<(i_axi_arsize+3)));
 	end endgenerate
 
 
@@ -1179,7 +1207,7 @@ module faxi_slave #(
 
 	always @(*)
 	if ((f_axi_rd_ckvalid > 0) && (OPT_MAXBURST < 8'hff))
-		assert(f_axi_rd_cklen+1 <= OPT_MAXBURST);
+		assert(f_axi_rd_cklen <= OPT_MAXBURST+1);
 
 	//
 	// The specification specifically prohibits any transaction from
@@ -1198,15 +1226,16 @@ module faxi_slave #(
 
 	end endgenerate
 
-	generate if (!OPT_NARROW_BURST)
-	begin
-		always @(*)
-		if (f_axi_rd_ckvalid > 0)
-			assert(DW == (1<<(f_axi_rd_cksize + 3)));
-	end else begin
+	generate if (OPT_NARROW_BURST)
+	begin : RD_NARROW_ASSERT
+
 		always @(*)
 		if (f_axi_rd_ckvalid > 0)
 			assert(DW >= (1<<(f_axi_rd_cksize + 3)));
+	end else begin : RD_SZ_ASSERT
+		always @(*)
+		if (f_axi_rd_ckvalid > 0)
+			assert(DW == (1<<(f_axi_rd_cksize + 3)));
 	end endgenerate
 
 
@@ -1376,8 +1405,7 @@ module faxi_slave #(
 		f_axi_rd_cklen <= 0;
 	end else begin
 
-		if (!f_axi_rd_ckvalid && f_axi_rd_check && i_axi_arid == f_axi_rd_checkid
-			&& i_axi_arvalid && i_axi_arready)
+		if (check_this_read_burst)
 		begin
 			//
 			// Decide to check the length of this burst
@@ -1411,10 +1439,6 @@ module faxi_slave #(
 	end
 
 	always @(*)
-		assert(f_axi_rdid_outstanding <= f_axi_rd_outstanding);
-	always @(*)
-		assert(f_axi_rdid_nbursts <= f_axi_rd_nbursts);
-	always @(*)
 	if (f_axi_rdid_outstanding == 0)
 		assert(f_axi_rdid_nbursts == 0);
 	else
@@ -1438,4 +1462,6 @@ module faxi_slave #(
 	always @(*)
 	if (f_axi_rd_ckvalid)
 		assert(f_axi_rd_cklen > 0);
+`undef	SLAVE_ASSUME
+`undef	SLAVE_ASSERT
 endmodule

@@ -1,0 +1,276 @@
+[*]
+[*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
+[*] Mon Apr 15 22:10:17 2019
+[*]
+[dumpfile] "(null)"
+[savefile] "/home/dan/work/rnd/opencores/wb2axip/trunk/bench/formal/wbm2axisp.gtkw"
+[timestart] 27
+[size] 1920 1029
+[pos] -1 -1
+*-4.814017 210 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] wbm2axisp.
+[sst_width] 196
+[signals_width] 294
+[sst_expanded] 1
+[sst_vpaned_height] 306
+@28
+wbm2axisp.i_clk
+wbm2axisp.i_reset
+@200
+-
+@800200
+-Wishbone
+@28
+[color] 3
+wbm2axisp.i_wb_cyc
+[color] 3
+wbm2axisp.i_wb_stb
+[color] 3
+wbm2axisp.i_wb_we
+@22
+[color] 3
+wbm2axisp.i_wb_addr[25:0]
+[color] 3
+wbm2axisp.i_wb_data[31:0]
+[color] 3
+wbm2axisp.i_wb_sel[3:0]
+@200
+-
+@28
+[color] 2
+wbm2axisp.o_wb_stall
+[color] 2
+wbm2axisp.o_wb_ack
+@22
+[color] 2
+wbm2axisp.o_wb_data[31:0]
+@28
+[color] 2
+wbm2axisp.o_wb_err
+@1000200
+-Wishbone
+@28
+wbm2axisp.direction
+@c00200
+-Skid buffer
+@28
+wbm2axisp.r_stb
+wbm2axisp.r_we
+@22
+wbm2axisp.r_addr[25:0]
+wbm2axisp.r_data[31:0]
+wbm2axisp.r_sel[3:0]
+@1401200
+-Skid buffer
+@200
+-
+@c00200
+-AXI Write
+@28
+[color] 2
+wbm2axisp.o_axi_awvalid
+[color] 3
+wbm2axisp.i_axi_awready
+[color] 2
+wbm2axisp.o_axi_awid
+@22
+[color] 2
+wbm2axisp.o_axi_awaddr[27:0]
+[color] 2
+wbm2axisp.o_axi_awlen[7:0]
+@28
+[color] 2
+wbm2axisp.o_axi_awburst[1:0]
+@22
+[color] 2
+wbm2axisp.o_axi_awcache[3:0]
+@28
+[color] 2
+wbm2axisp.o_axi_awprot[2:0]
+@22
+[color] 2
+wbm2axisp.o_axi_awqos[3:0]
+@28
+[color] 2
+wbm2axisp.o_axi_awsize[2:0]
+[color] 2
+wbm2axisp.o_axi_awlock
+@200
+-
+@28
+[color] 2
+wbm2axisp.o_axi_wvalid
+[color] 3
+wbm2axisp.i_axi_wready
+@22
+[color] 2
+wbm2axisp.o_axi_wdata[127:0]
+@c00022
+[color] 2
+wbm2axisp.o_axi_wstrb[15:0]
+@28
+[color] 2
+(0)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(1)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(2)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(3)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(4)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(5)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(6)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(7)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(8)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(9)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(10)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(11)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(12)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(13)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(14)wbm2axisp.o_axi_wstrb[15:0]
+[color] 2
+(15)wbm2axisp.o_axi_wstrb[15:0]
+@1401200
+-group_end
+@28
+[color] 2
+wbm2axisp.o_axi_wlast
+@200
+-
+@28
+[color] 3
+wbm2axisp.i_axi_bvalid
+[color] 2
+wbm2axisp.o_axi_bready
+[color] 3
+wbm2axisp.i_axi_bid
+[color] 3
+wbm2axisp.i_axi_bresp[1:0]
+@1401200
+-AXI Write
+@22
+wbm2axisp.npending[6:0]
+@28
+wbm2axisp.full
+wbm2axisp.nearfull
+@200
+-
+@800200
+-AXI Read
+@28
+[color] 2
+wbm2axisp.o_axi_arvalid
+[color] 3
+wbm2axisp.i_axi_arready
+[color] 2
+wbm2axisp.o_axi_arid
+@23
+[color] 2
+wbm2axisp.o_axi_araddr[27:0]
+@22
+[color] 2
+wbm2axisp.o_axi_arlen[7:0]
+@28
+[color] 2
+wbm2axisp.o_axi_arburst[1:0]
+@22
+[color] 2
+wbm2axisp.o_axi_arcache[3:0]
+@28
+[color] 2
+wbm2axisp.o_axi_arprot[2:0]
+@22
+[color] 2
+wbm2axisp.o_axi_arqos[3:0]
+@28
+[color] 2
+wbm2axisp.o_axi_arsize[2:0]
+[color] 2
+wbm2axisp.o_axi_arlock
+@200
+-
+@28
+[color] 3
+wbm2axisp.i_axi_rvalid
+[color] 2
+wbm2axisp.o_axi_rready
+[color] 3
+wbm2axisp.i_axi_rid
+[color] 3
+wbm2axisp.i_axi_rlast
+@22
+[color] 3
+wbm2axisp.i_axi_rdata[127:0]
+@28
+[color] 3
+wbm2axisp.i_axi_rresp[1:0]
+@1000200
+-AXI Read
+@800200
+-AXI Read Check signals
+@22
+wbm2axisp.f_axi.f_axi_rd_nbursts[8:0]
+wbm2axisp.f_axi.f_axi_rd_outstanding[8:0]
+wbm2axisp.f_axi.f_axi_rdid_nbursts[8:0]
+wbm2axisp.f_axi.f_axi_rdid_outstanding[8:0]
+@200
+-
+@28
+wbm2axisp.f_axi.f_axi_rd_check
+wbm2axisp.f_axi.check_this_read_burst
+wbm2axisp.f_axi.f_axi_rd_ckvalid
+wbm2axisp.f_axi.f_axi_rd_checkid
+@22
+wbm2axisp.f_axi.f_axi_rd_ckaddr[27:0]
+wbm2axisp.f_axi.f_axi_rd_ckarlen[7:0]
+@28
+wbm2axisp.f_axi.f_axi_rd_ckburst[1:0]
+@22
+wbm2axisp.f_axi.f_axi_rd_ckincr[7:0]
+wbm2axisp.f_axi.f_axi_rd_cklen[8:0]
+@28
+[color] 1
+wbm2axisp.f_axi.f_axi_rd_cksize[2:0]
+@22
+wbm2axisp.f_axi.f_axi_rdid_ckign_nbursts[8:0]
+wbm2axisp.f_axi.f_axi_rdid_ckign_outstanding[8:0]
+@1000200
+-AXI Read Check signals
+@c00200
+-AXI Write Check signals
+@22
+wbm2axisp.f_axi.f_axi_awr_nbursts[8:0]
+wbm2axisp.f_axi.f_axi_wr_pending[8:0]
+wbm2axisp.f_axi.f_axi_wrid_nbursts[8:0]
+@200
+-
+@22
+wbm2axisp.f_axi.f_axi_wr_addr[27:0]
+@28
+wbm2axisp.f_axi.f_axi_wr_checkid
+wbm2axisp.f_axi.f_axi_wr_ckvalid
+@22
+wbm2axisp.f_axi.f_axi_wr_incr[7:0]
+wbm2axisp.f_axi.f_axi_wr_len[7:0]
+@28
+wbm2axisp.f_axi.f_axi_wr_burst[1:0]
+wbm2axisp.f_axi.f_axi_wr_size[2:0]
+@22
+wbm2axisp.f_axi.strb_mask[15:0]
+@28
+wbm2axisp.f_axi.this_awsize[2:0]
+@1401200
+-AXI Write Check signals
+[pattern_trace] 1
+[pattern_trace] 0

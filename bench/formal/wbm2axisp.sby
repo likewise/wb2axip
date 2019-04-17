@@ -1,6 +1,17 @@
+[tasks]
+prfx8		prf
+prfx16		prf
+prfe32		prf
+prfx32		prf
+prfx64		prf
+prfx128		prf
+prfx256		prf
+prfx512		prf
+prfx1024	prf
+
 [options]
 mode prove
-depth 32
+depth 8
 
 [engines]
 smtbmc
@@ -8,10 +19,44 @@ smtbmc
 [script]
 read -formal -D WBM2AXISP wbm2axisp.v
 read -formal -D WBM2AXISP faxi_master.v
+read -formal -D WBM2AXISP faxi_addr.v
 read -formal -D WBM2AXISP fwb_slave.v
+chparam -set AW 20 wbm2axisp
+prfx8:    chparam -set DW  8 wbm2axisp
+prfx16:   chparam -set DW  8 wbm2axisp
+prfe32:   chparam -set DW  8 wbm2axisp
+prfx32:   chparam -set DW 32 wbm2axisp
+prfx64:   chparam -set DW 32 wbm2axisp
+prfx128:  chparam -set DW 32 wbm2axisp
+prfx256:  chparam -set DW 32 wbm2axisp
+prfx512:  chparam -set DW 32 wbm2axisp
+prfx1024: chparam -set DW 32 wbm2axisp
+#
+prfx8:    chparam -set C_AXI_DATA_WIDTH    8 wbm2axisp
+prfx16:   chparam -set C_AXI_DATA_WIDTH   16 wbm2axisp
+prfe32:   chparam -set C_AXI_DATA_WIDTH   32 wbm2axisp
+prfx32:   chparam -set C_AXI_DATA_WIDTH   32 wbm2axisp
+prfx64:   chparam -set C_AXI_DATA_WIDTH   64 wbm2axisp
+prfx128:  chparam -set C_AXI_DATA_WIDTH  128 wbm2axisp
+prfx256:  chparam -set C_AXI_DATA_WIDTH  256 wbm2axisp
+prfx512:  chparam -set C_AXI_DATA_WIDTH  512 wbm2axisp
+prfx1024: chparam -set C_AXI_DATA_WIDTH 1024 wbm2axisp
+#
+prfx8:    chparam -set C_AXI_ADDR_WIDTH   20 wbm2axisp
+prfx16:   chparam -set C_AXI_ADDR_WIDTH   20 wbm2axisp
+prfe32:   chparam -set C_AXI_ADDR_WIDTH   20 wbm2axisp
+
+prfx32:   chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
+prfx64:   chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
+prfx128:  chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
+prfx256:  chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
+prfx512:  chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
+prfx1024: chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
+#
 prep -top wbm2axisp
 
 [files]
 ../../rtl/wbm2axisp.v
 faxi_master.v
+faxi_addr.v
 fwb_slave.v

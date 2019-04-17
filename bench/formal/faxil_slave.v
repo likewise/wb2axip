@@ -643,4 +643,6 @@ module faxil_slave #(
 	always @(posedge i_clk)
 	if (!F_OPT_WRITE_ONLY)
 		cover((i_axi_rvalid)&&(i_axi_rready));
+`undef	SLAVE_ASSUME
+`undef	SLAVE_ASSERT
 endmodule

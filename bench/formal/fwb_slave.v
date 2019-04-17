@@ -400,4 +400,6 @@ module	fwb_slave(i_clk, i_reset,
 			`SLAVE_ASSUME(!i_wb_stb);
 	end endgenerate
 
+`undef	SLAVE_ASSUME
+`undef	SLAVE_ASSERT
 endmodule
