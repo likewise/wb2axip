@@ -1,0 +1,421 @@
+[*]
+[*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
+[*] Thu Apr 18 02:42:59 2019
+[*]
+[dumpfile] "/home/dan/work/rnd/opencores/wb2axip/trunk/bench/formal/axisafety_prf/engine_0/trace.vcd"
+[dumpfile_mtime] "Thu Apr 18 02:41:15 2019"
+[dumpfile_size] 114504
+[savefile] "/home/dan/work/rnd/opencores/wb2axip/trunk/bench/formal/axisafety.gtkw"
+[timestart] 0
+[size] 1920 1054
+[pos] -1 -1
+*-5.736434 180 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] axisafety.
+[treeopen] axisafety.f_master.
+[treeopen] axisafety.f_slave.
+[sst_width] 196
+[signals_width] 262
+[sst_expanded] 1
+[sst_vpaned_height] 315
+@28
+axisafety.S_AXI_ACLK
+axisafety.S_AXI_ARESETN
+@200
+-
+@800200
+-Upstream write
+@28
+[color] 3
+axisafety.S_AXI_AWVALID
+[color] 3
+axisafety.S_AXI_AWREADY
+[color] 3
+axisafety.S_AXI_AWID
+@22
+[color] 3
+axisafety.S_AXI_AWADDR[5:0]
+[color] 3
+axisafety.S_AXI_AWLEN[7:0]
+@28
+[color] 3
+axisafety.S_AXI_AWSIZE[2:0]
+[color] 3
+axisafety.S_AXI_AWBURST[1:0]
+@22
+[color] 3
+axisafety.S_AXI_AWCACHE[3:0]
+@28
+[color] 3
+axisafety.S_AXI_AWLOCK
+[color] 3
+axisafety.S_AXI_AWPROT[2:0]
+@22
+[color] 3
+axisafety.S_AXI_AWQOS[3:0]
+@200
+-
+@28
+[color] 3
+axisafety.S_AXI_WVALID
+[color] 3
+axisafety.S_AXI_WREADY
+@22
+[color] 3
+axisafety.S_AXI_WDATA[31:0]
+[color] 3
+axisafety.S_AXI_WSTRB[3:0]
+@28
+[color] 3
+axisafety.S_AXI_WLAST
+@22
+axisafety.f_axi_wr_addr[5:0]
+axisafety.f_slave.CHECK_STALL_COUNT.f_axi_awstall[8:0]
+axisafety.f_slave.CHECK_STALL_COUNT.f_axi_wstall[8:0]
+@200
+-
+@28
+[color] 2
+axisafety.S_AXI_BVALID
+[color] 3
+axisafety.S_AXI_BREADY
+[color] 2
+axisafety.S_AXI_BID
+[color] 2
+axisafety.S_AXI_BRESP[1:0]
+@1000200
+-Upstream write
+@c00200
+-Formal upstream write info
+@28
+axisafety.f_axi_wr_checkid
+axisafety.f_axi_wr_ckvalid
+axisafety.f_axi_wr_burst[1:0]
+@22
+axisafety.f_axi_wr_incr[7:0]
+axisafety.f_axi_wr_len[7:0]
+@28
+axisafety.f_axi_wr_size[2:0]
+@22
+axisafety.f_axi_wr_pending[8:0]
+axisafety.f_axi_wrid_nbursts[8:0]
+axisafety.s_wbursts[3:0]
+@1401200
+-Formal upstream write info
+@22
+axisafety.m_wpending[8:0]
+axisafety.read_timeout[5:0]
+axisafety.write_timeout[5:0]
+@28
+axisafety.write_fault
+@22
+axisafety.s_wbursts[3:0]
+@28
+axisafety.wfifo_id
+axisafety.m_bvalid
+axisafety.r_bvalid
+@c00200
+-Write double buffers
+@28
+axisafety.r_wvalid
+@22
+axisafety.r_wdata[31:0]
+axisafety.r_wstrb[3:0]
+@28
+axisafety.r_wlast
+@200
+-
+@28
+axisafety.r_bvalid
+axisafety.r_bid
+axisafety.r_bresp[1:0]
+@1401200
+-Write double buffers
+@22
+axisafety.m_wpending[8:0]
+@200
+-
+@c00200
+-Upstream read
+@28
+[color] 3
+axisafety.S_AXI_ARVALID
+[color] 2
+axisafety.S_AXI_ARREADY
+[color] 3
+axisafety.S_AXI_ARID
+@22
+[color] 3
+axisafety.S_AXI_ARADDR[5:0]
+[color] 7
+axisafety.S_AXI_ARLEN[7:0]
+@28
+[color] 3
+axisafety.S_AXI_ARSIZE[2:0]
+[color] 3
+axisafety.S_AXI_ARBURST[1:0]
+[color] 3
+axisafety.S_AXI_ARLOCK
+@22
+[color] 3
+axisafety.S_AXI_ARCACHE[3:0]
+@28
+[color] 3
+axisafety.S_AXI_ARPROT[2:0]
+@22
+[color] 3
+axisafety.S_AXI_ARQOS[3:0]
+@200
+-
+@28
+[color] 2
+axisafety.S_AXI_RVALID
+[color] 3
+axisafety.S_AXI_RREADY
+[color] 2
+axisafety.S_AXI_RID
+@22
+[color] 2
+axisafety.S_AXI_RDATA[31:0]
+@28
+[color] 2
+axisafety.S_AXI_RRESP[1:0]
+[color] 2
+axisafety.S_AXI_RLAST
+@1401200
+-Upstream read
+@22
+axisafety.rfifo_counter[8:0]
+@c00200
+-Formal upstream read info
+@28
+axisafety.read_fault
+@22
+axisafety.read_timeout[5:0]
+axisafety.rfifo_counter[8:0]
+@28
+[color] 3
+axisafety.r_rvalid
+axisafety.r_rid
+@22
+axisafety.r_rdata[31:0]
+@28
+axisafety.r_rresp[1:0]
+@200
+-
+@28
+axisafety.f_axi_rd_ckvalid
+axisafety.f_axi_rd_checkid
+@22
+axisafety.f_axi_rd_cklen[8:0]
+axisafety.f_axi_rd_ckaddr[5:0]
+axisafety.f_axi_rd_ckarlen[7:0]
+@28
+axisafety.f_axi_rd_ckburst[1:0]
+@22
+axisafety.f_axi_rd_ckincr[7:0]
+@28
+axisafety.f_axi_rd_cksize[2:0]
+@200
+-
+@22
+axisafety.f_axi_rd_nbursts[8:0]
+axisafety.f_axi_rdid_nbursts[8:0]
+axisafety.f_axi_rdid_ckign_nbursts[8:0]
+@200
+-
+@22
+axisafety.f_axi_rd_outstanding[8:0]
+axisafety.f_axi_rdid_outstanding[8:0]
+axisafety.f_axi_rdid_ckign_outstanding[8:0]
+@200
+-
+@22
+axisafety.f_axi_rd_outstanding[8:0]
+axisafety.f_axi_rdid_outstanding[8:0]
+axisafety.f_axi_rdid_ckign_outstanding[8:0]
+axisafety.f_slave.f_axi_rdid_nbursts[8:0]
+axisafety.f_slave.f_axi_rd_nbursts[8:0]
+axisafety.f_slave.f_axi_rdid_ckign_nbursts[8:0]
+axisafety.f_slave.f_axi_rdid_nbursts[8:0]
+axisafety.f_slave.CHECK_MAX_DELAY.f_axi_rd_ack_delay[8:0]
+@1401200
+-Formal upstream read info
+@c00201
+-Read double buffers
+@28
+axisafety.r_rvalid
+axisafety.r_rid
+@22
+axisafety.r_rdata[31:0]
+@28
+axisafety.r_rresp[1:0]
+@200
+-
+@28
+axisafety.m_rvalid
+axisafety.m_rid
+@22
+axisafety.m_rdata[31:0]
+@28
+axisafety.m_rresp[1:0]
+axisafety.m_rlast
+@1401201
+-Read double buffers
+@800200
+-Downstream write channel
+@28
+[color] 2
+axisafety.M_AXI_AWVALID
+[color] 3
+axisafety.M_AXI_AWREADY
+[color] 2
+axisafety.M_AXI_AWID
+@22
+[color] 2
+axisafety.M_AXI_AWADDR[5:0]
+[color] 2
+axisafety.M_AXI_AWLEN[7:0]
+@28
+[color] 4
+axisafety.M_AXI_AWSIZE[2:0]
+[color] 2
+axisafety.M_AXI_AWBURST[1:0]
+@22
+[color] 2
+axisafety.M_AXI_AWCACHE[3:0]
+@28
+[color] 2
+axisafety.M_AXI_AWLOCK
+[color] 2
+axisafety.M_AXI_AWPROT[2:0]
+@22
+[color] 2
+axisafety.M_AXI_AWQOS[3:0]
+@200
+-
+@28
+[color] 2
+axisafety.M_AXI_WVALID
+[color] 3
+axisafety.M_AXI_WREADY
+@22
+[color] 2
+axisafety.M_AXI_WDATA[31:0]
+[color] 2
+axisafety.M_AXI_WSTRB[3:0]
+@28
+[color] 2
+axisafety.M_AXI_WLAST
+@22
+axisafety.f_master.f_axi_wr_addr[5:0]
+@28
+axisafety.f_master.f_axi_rd_cksize[2:0]
+@22
+axisafety.f_master.strb_mask[3:0]
+@28
+axisafety.f_master.this_awsize[2:0]
+axisafety.f_master.i_axi_awsize[2:0]
+@200
+-
+@28
+[color] 3
+axisafety.M_AXI_BVALID
+[color] 2
+axisafety.M_AXI_BREADY
+[color] 3
+axisafety.M_AXI_BID
+[color] 3
+axisafety.M_AXI_BRESP[1:0]
+@1000200
+-Downstream write channel
+@22
+axisafety.f_axi_wr_addr[5:0]
+@c00200
+-Downstream read channel
+@28
+[color] 2
+axisafety.M_AXI_ARVALID
+[color] 3
+axisafety.M_AXI_ARREADY
+[color] 2
+axisafety.M_AXI_ARID
+@22
+[color] 2
+axisafety.M_AXI_ARADDR[5:0]
+[color] 7
+axisafety.M_AXI_ARLEN[7:0]
+@28
+[color] 2
+axisafety.M_AXI_ARSIZE[2:0]
+[color] 2
+axisafety.M_AXI_ARBURST[1:0]
+@22
+[color] 2
+axisafety.M_AXI_ARCACHE[3:0]
+@28
+[color] 2
+axisafety.M_AXI_ARLOCK
+[color] 2
+axisafety.M_AXI_ARPROT[2:0]
+@22
+[color] 2
+axisafety.M_AXI_ARQOS[3:0]
+@200
+-
+@28
+[color] 3
+axisafety.M_AXI_RVALID
+[color] 2
+axisafety.M_AXI_RREADY
+[color] 3
+axisafety.M_AXI_RID
+@22
+[color] 3
+axisafety.M_AXI_RDATA[31:0]
+@28
+[color] 3
+axisafety.M_AXI_RRESP[1:0]
+[color] 3
+axisafety.M_AXI_RLAST
+@1401200
+-Downstream read channel
+@28
+axisafety.rfifo_id
+@22
+axisafety.f_axi_awr_nbursts[8:0]
+axisafety.fm_axi_wrid_nbursts[8:0]
+axisafety.f_axi_wr_pending[8:0]
+axisafety.fm_axi_wr_pending[8:0]
+@200
+-
+@28
+axisafety.f_axi_wr_ckvalid
+axisafety.fm_axi_wr_ckvalid
+axisafety.fm_axi_wr_checkid
+@22
+axisafety.fm_axi_wr_len[7:0]
+axisafety.fm_axi_wr_pending[8:0]
+@200
+-
+@22
+axisafety.f_axi_wr_len[7:0]
+axisafety.fm_axi_wr_len[7:0]
+axisafety.f_axi_wr_addr[5:0]
+@28
+axisafety.f_axi_wr_size[2:0]
+axisafety.fm_axi_wr_size[2:0]
+@22
+[color] 3
+axisafety.fm_axi_wrid_nbursts[8:0]
+[color] 3
+axisafety.fm_axi_awr_nbursts[8:0]
+@28
+axisafety.fm_axi_wr_burst[1:0]
+axisafety.f_axi_wr_burst[1:0]
+@22
+axisafety.r_waddr[5:0]
+axisafety.m_waddr[5:0]
+axisafety.fm_waddr[5:0]
+axisafety.fm_axi_wr_addr[5:0]
+[pattern_trace] 1
+[pattern_trace] 0

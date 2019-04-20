@@ -1,0 +1,31 @@
+[tasks]
+cvr
+prf
+fault prf
+
+[options]
+cvr: mode cover
+cvr: depth 60
+prf: mode prove
+prf: depth 20
+append 0
+
+[engines]
+smtbmc boolector
+# smtbmc z3
+# abc bmc3
+
+[script]
+read -formal axisafety.v
+read -formal faxi_slave.v
+read -formal faxi_master.v
+read -formal faxi_addr.v
+~fault: chparam -set F_OPT_FAULTLESS 1 axisafety
+fault:  chparam -set F_OPT_FAULTLESS 0 axisafety
+prep -top axisafety
+
+[files]
+../../rtl/axisafety.v
+faxi_slave.v
+faxi_master.v
+faxi_addr.v

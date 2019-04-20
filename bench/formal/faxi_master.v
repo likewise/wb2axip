@@ -389,13 +389,14 @@ module faxi_master #(
 		//
 		reg	[(F_LGDEPTH-1):0]	f_axi_awstall,
 						f_axi_wstall,
-						f_axi_arstall,
-						f_axi_bstall,
-						f_axi_rstall;
+						f_axi_arstall;
+						// f_axi_bstall,
+						// f_axi_rstall;
 
 		initial	f_axi_awstall = 0;
 		always @(posedge i_clk)
-		if ((!i_axi_reset_n)||(!i_axi_awvalid)||(i_axi_awready))
+		if ((!i_axi_reset_n)||(!i_axi_awvalid)||(i_axi_awready)
+				||(f_axi_wr_pending > 0))
 			f_axi_awstall <= 0;
 		else if ((!i_axi_bvalid)||(i_axi_bready))
 			f_axi_awstall <= f_axi_awstall + 1'b1;
@@ -413,13 +414,13 @@ module faxi_master #(
 		initial	f_axi_wstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_wvalid)||(i_axi_wready)
-				||(f_axi_wr_pending == 0))
+				||(f_axi_wr_pending == 0 && i_axi_wvalid))
 			f_axi_wstall <= 0;
 		else if ((!i_axi_bvalid)||(i_axi_bready))
 			f_axi_wstall <= f_axi_wstall + 1'b1;
 
 		always @(*)
-			`SLAVE_ASSUME(f_axi_wstall < F_AXI_MAXWAIT);
+			`SLAVE_ASSERT(f_axi_wstall < F_AXI_MAXWAIT);
 
 		//
 		// AXI read address channel
@@ -428,7 +429,7 @@ module faxi_master #(
 		initial	f_axi_arstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_arvalid)||(i_axi_arready)
-				||(i_axi_rvalid))
+				||(i_axi_rvalid)||(f_axi_rd_nbursts > 0))
 			f_axi_arstall <= 0;
 		else if ((!i_axi_rvalid)||(i_axi_rready))
 			f_axi_arstall <= f_axi_arstall + 1'b1;
@@ -457,8 +458,22 @@ module faxi_master #(
 		// AXI write address channel
 		//
 		//
-		reg	[(F_LGDEPTH-1):0]	f_axi_bstall,
+		reg	[(F_LGDEPTH-1):0]	f_axi_wvstall,
+						f_axi_bstall,
 						f_axi_rstall;
+
+		// AXI write channel valid
+		initial	f_axi_bstall = 0;
+		always @(posedge i_clk)
+		if ((!i_axi_reset_n)||(i_axi_wvalid)
+				||(i_axi_bvalid && !i_axi_bready)
+				||(f_axi_wr_pending == 0))
+			f_axi_wvstall <= 0;
+		else
+			f_axi_wvstall <= f_axi_wvstall + 1'b1;
+
+		always @(*)
+			`SLAVE_ASSUME(f_axi_wvstall < F_AXI_MAXRSTALL);
 
 		// AXI write response channel
 		initial	f_axi_bstall = 0;
@@ -688,13 +703,6 @@ module faxi_master #(
 		reg	[(F_LGDEPTH-1):0]	f_axi_awr_ack_delay,
 						f_axi_rd_ack_delay;
 
-		initial	f_axi_rd_ack_delay = 0;
-		always @(posedge i_clk)
-		if ((!i_axi_reset_n)||(i_axi_rvalid)||(f_axi_rd_outstanding==0))
-			f_axi_rd_ack_delay <= 0;
-		else
-			f_axi_rd_ack_delay <= f_axi_rd_ack_delay + 1'b1;
-
 		initial	f_axi_awr_ack_delay = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(i_axi_bvalid)||(i_axi_wvalid)
@@ -705,11 +713,19 @@ module faxi_master #(
 		else
 			f_axi_awr_ack_delay <= f_axi_awr_ack_delay + 1'b1;
 
-		always @(*)
-			`SLAVE_ASSERT(f_axi_rd_ack_delay < F_AXI_MAXDELAY);
+		initial	f_axi_rd_ack_delay = 0;
+		always @(posedge i_clk)
+		if ((!i_axi_reset_n)||(i_axi_rvalid)||(f_axi_rd_outstanding==0))
+			f_axi_rd_ack_delay <= 0;
+		else
+			f_axi_rd_ack_delay <= f_axi_rd_ack_delay + 1'b1;
 
 		always @(posedge i_clk)
 			`SLAVE_ASSERT(f_axi_awr_ack_delay < F_AXI_MAXDELAY);
+
+		always @(*)
+			`SLAVE_ASSERT(f_axi_rd_ack_delay < F_AXI_MAXDELAY);
+
 	end endgenerate
 
 	////////////////////////////////////////////////////////////////////////
@@ -759,8 +775,24 @@ module faxi_master #(
 	begin
 		`SLAVE_ASSERT(f_axi_rd_outstanding > 0);
 		`SLAVE_ASSERT(f_axi_rd_nbursts > 0);
+		if (f_axi_rd_checkid == i_axi_rid)
+		begin
+			`SLAVE_ASSERT(f_axi_rdid_nbursts > 0);
+			`SLAVE_ASSERT(f_axi_rdid_outstanding > 0);
+		end
+
 		if (!i_axi_rlast)
+		begin
 			`SLAVE_ASSERT(f_axi_rd_outstanding > 1);
+			if (f_axi_rd_checkid == i_axi_rid)
+				`SLAVE_ASSERT(f_axi_rdid_outstanding > 1);
+		end else begin
+			if (f_axi_rd_nbursts == 1)
+				`SLAVE_ASSERT(f_axi_rd_outstanding == 1);
+			if ((f_axi_rd_checkid == i_axi_rid)
+					&& (f_axi_rdid_nbursts == 1))
+				`SLAVE_ASSERT(f_axi_rdid_outstanding == 1);
+		end
 	end
 
 	always @(*)
@@ -841,7 +873,7 @@ module faxi_master #(
 		`SLAVE_ASSUME(awr_aligned);
 
 	always @(*)
-		this_awsize = (f_axi_wr_pending>1) ? f_axi_wr_size : i_axi_awsize;
+		this_awsize = (f_axi_wr_pending>0) ? f_axi_wr_size : i_axi_awsize;
 		
 	faxi_addr #(.AW(AW)) get_next_waddr(
 		(f_axi_wr_pending>1) ? f_axi_wr_addr  : i_axi_awaddr,
@@ -952,7 +984,7 @@ module faxi_master #(
 			if (DW == 1024)
 				strb_mask = strb_mask << f_axi_wr_addr[6:0];
 
-			if (i_axi_wvalid)
+			if (i_axi_wvalid && (f_axi_wr_pending > 0))
 				`SLAVE_ASSUME((i_axi_wstrb & ~strb_mask) == 0);
 		end
 	end endgenerate
@@ -1457,9 +1489,19 @@ module faxi_master #(
 		assert(f_axi_rd_cklen == 0);
 		assert(f_axi_rdid_ckign_nbursts == 0);
 		assert(f_axi_rdid_ckign_outstanding == 0);
+	end else begin
+		assert(f_axi_rdid_ckign_nbursts < f_axi_rdid_nbursts);
+		assert(f_axi_rdid_ckign_outstanding < f_axi_rdid_outstanding);
 	end
+
+	always @(*)
+	if (f_axi_rd_ckvalid && (f_axi_rdid_ckign_nbursts == 0)
+		&& i_axi_rvalid && (i_axi_rid == f_axi_rd_checkid))
+		`SLAVE_ASSERT(i_axi_rlast == (f_axi_rd_cklen == 1));
 
 	always @(*)
 	if (f_axi_rd_ckvalid)
 		assert(f_axi_rd_cklen > 0);
+`undef	SLAVE_ASSUME
+`undef	SLAVE_ASSERT
 endmodule
