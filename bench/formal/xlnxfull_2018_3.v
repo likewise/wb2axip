@@ -663,7 +663,7 @@ module xlnxfull_2018_3 #(
 		.C_AXI_ID_WIDTH(C_S_AXI_ID_WIDTH),
 		.C_AXI_DATA_WIDTH(C_S_AXI_DATA_WIDTH),
 		.C_AXI_ADDR_WIDTH(C_S_AXI_ADDR_WIDTH),
-		.OPT_NARROW_BURST(1),
+		.OPT_NARROW_BURST(0),
 		.OPT_EXCLUSIVE(0),
 		.F_LGDEPTH(F_LGDEPTH))
 		f_slave(
@@ -899,17 +899,16 @@ module xlnxfull_2018_3 #(
 	if (f_axi_awr_nbursts > 0)
 		assert(axi_awv_awr_flag || S_AXI_BVALID);
 	always @(*)
-	if (f_axi_wr_pending > 0)
+	if ((f_axi_wr_ckvalid)&&(f_axi_wr_pending > 0))
+	begin
 		assert(axi_awaddr == f_axi_wr_addr);
-	always @(*)
-	if (f_axi_wr_pending > 0)
 		assert(axi_awburst == f_axi_wr_burst);
+		assert(axi_awlen == f_axi_wr_len);
+	end
+
 	always @(*)
 	if (axi_arv_arr_flag || !axi_awv_awr_flag)
 		assert(!S_AXI_WREADY);
-	always @(*)
-	if (f_axi_wr_pending)
-		assert(axi_awlen == f_axi_wr_len);
 
 	////////////////////////////////////////////////////////////////////////
 	//

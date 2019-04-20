@@ -1,13 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.86 (w)1999-2017 BSI
-[*] Sun Mar 24 02:05:44 2019
+[*] Sat Apr 20 00:33:32 2019
 [*]
-[dumpfile] "(null)"
+[dumpfile] "/home/dan/jericho/work/rnd/opencores/wb2axip/trunk/bench/formal/xlnxfull_2018_3_prf/engine_0/trace_induct.vcd"
+[dumpfile_mtime] "Fri Apr 19 23:28:55 2019"
+[dumpfile_size] 56899
 [savefile] "/home/dan/jericho/work/rnd/opencores/wb2axip/trunk/bench/formal/xlnxfull_2018_3.gtkw"
-[timestart] 13
+[timestart] 0
 [size] 1816 972
-[pos] -817 -1
-*-5.054117 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[pos] -1 -1
+*-5.054117 120 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] xlnxfull_2018_3.
 [sst_width] 270
 [signals_width] 360
@@ -18,45 +20,96 @@ xlnxfull_2018_3.S_AXI_ARESETN
 xlnxfull_2018_3.S_AXI_ACLK
 @200
 -
+@800200
+-Write channel
 @28
+[color] 3
 xlnxfull_2018_3.S_AXI_AWVALID
+[color] 2
 xlnxfull_2018_3.S_AXI_AWREADY
-@22
-xlnxfull_2018_3.S_AXI_AWADDR[5:0]
-@28
-xlnxfull_2018_3.S_AXI_AWBURST[1:0]
-@22
-xlnxfull_2018_3.S_AXI_AWCACHE[3:0]
-@28
+[color] 3
 xlnxfull_2018_3.S_AXI_AWID
 @22
+[color] 3
+xlnxfull_2018_3.S_AXI_AWADDR[5:0]
+[color] 6
 xlnxfull_2018_3.S_AXI_AWLEN[7:0]
 @28
+[color] 3
+xlnxfull_2018_3.S_AXI_AWBURST[1:0]
+[color] 3
+xlnxfull_2018_3.S_AXI_AWSIZE[2:0]
+[color] 3
 xlnxfull_2018_3.S_AXI_AWLOCK
+@22
+[color] 3
+xlnxfull_2018_3.S_AXI_AWCACHE[3:0]
+@28
+[color] 3
 xlnxfull_2018_3.S_AXI_AWPROT[2:0]
 @22
+[color] 3
 xlnxfull_2018_3.S_AXI_AWQOS[3:0]
+[color] 3
 xlnxfull_2018_3.S_AXI_AWREGION[3:0]
-@28
-xlnxfull_2018_3.S_AXI_AWSIZE[2:0]
 @200
 -
 @28
+[color] 3
 xlnxfull_2018_3.S_AXI_WVALID
+[color] 2
 xlnxfull_2018_3.S_AXI_WREADY
-xlnxfull_2018_3.S_AXI_WLAST
 @22
+[color] 3
 xlnxfull_2018_3.S_AXI_WDATA[31:0]
+[color] 3
 xlnxfull_2018_3.S_AXI_WSTRB[3:0]
+@28
+[color] 3
+xlnxfull_2018_3.S_AXI_WLAST
 @200
 -
 @28
+[color] 2
 xlnxfull_2018_3.S_AXI_BVALID
-xlnxfull_2018_3.S_AXI_BID
+[color] 3
 xlnxfull_2018_3.S_AXI_BREADY
+[color] 2
+xlnxfull_2018_3.S_AXI_BID
+[color] 2
 xlnxfull_2018_3.S_AXI_BRESP[1:0]
+@1000200
+-Write channel
+@23
+xlnxfull_2018_3.axi_awaddr[5:0]
+@800200
+-Formal write properties
+@28
+xlnxfull_2018_3.f_axi_wr_ckvalid
+xlnxfull_2018_3.f_axi_wr_checkid
 @200
 -
+@22
+xlnxfull_2018_3.f_axi_awr_nbursts[9:0]
+xlnxfull_2018_3.f_axi_wrid_nbursts[9:0]
+xlnxfull_2018_3.f_axi_wr_pending[8:0]
+@200
+-
+@22
+xlnxfull_2018_3.f_axi_wr_addr[5:0]
+@28
+xlnxfull_2018_3.f_axi_wr_burst[1:0]
+@22
+xlnxfull_2018_3.f_axi_wr_incr[7:0]
+xlnxfull_2018_3.f_axi_wr_len[7:0]
+@28
+xlnxfull_2018_3.f_axi_wr_size[2:0]
+@1000200
+-Formal write properties
+@200
+-
+@c00200
+-Read channel
 @28
 [color] 3
 xlnxfull_2018_3.S_AXI_ARVALID
@@ -105,21 +158,52 @@ xlnxfull_2018_3.S_AXI_RDATA[31:0]
 @28
 [color] 2
 xlnxfull_2018_3.S_AXI_RRESP[1:0]
-@200
--
-@28
-xlnxfull_2018_3.f_axi_rd_checkid
-@22
-xlnxfull_2018_3.f_axi_rd_cklen[8:0]
+@1401200
+-Read channel
+@c00200
+-Formal read properties
 @28
 xlnxfull_2018_3.f_axi_rd_ckvalid
-@23
-xlnxfull_2018_3.f_axi_rd_nbursts[9:0]
+xlnxfull_2018_3.f_axi_rd_checkid
+@200
+-
 @22
-xlnxfull_2018_3.f_axi_rd_outstanding[9:0]
-xlnxfull_2018_3.f_axi_rdid_ckign_nbursts[9:0]
-xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+xlnxfull_2018_3.f_axi_rd_nbursts[9:0]
 xlnxfull_2018_3.f_axi_rdid_nbursts[9:0]
+xlnxfull_2018_3.f_axi_rd_outstanding[9:0]
 xlnxfull_2018_3.f_axi_rdid_outstanding[9:0]
+@200
+-
+@22
+xlnxfull_2018_3.f_axi_rdid_ckign_nbursts[9:0]
+@c00022
+xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+@28
+(0)xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+(1)xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+(2)xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+(3)xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+(4)xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+(5)xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+(6)xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+(7)xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+(8)xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+(9)xlnxfull_2018_3.f_axi_rdid_ckign_outstanding[9:0]
+@1401200
+-group_end
+@200
+-
+@22
+xlnxfull_2018_3.f_axi_rd_ckaddr[5:0]
+xlnxfull_2018_3.f_axi_rd_ckarlen[7:0]
+@28
+xlnxfull_2018_3.f_axi_rd_ckburst[1:0]
+@22
+xlnxfull_2018_3.f_axi_rd_ckincr[7:0]
+xlnxfull_2018_3.f_axi_rd_cklen[8:0]
+@28
+xlnxfull_2018_3.f_axi_rd_cksize[2:0]
+@1401200
+-Formal read properties
 [pattern_trace] 1
 [pattern_trace] 0
