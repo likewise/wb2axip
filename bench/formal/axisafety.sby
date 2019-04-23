@@ -7,7 +7,7 @@ fault prf
 cvr: mode cover
 cvr: depth 60
 prf: mode prove
-prf: depth 20
+prf: depth 18
 append 0
 
 [engines]
