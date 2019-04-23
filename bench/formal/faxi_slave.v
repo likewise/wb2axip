@@ -49,13 +49,15 @@ module faxi_slave #(
 	parameter C_AXI_ADDR_WIDTH	= 28,	// AXI Address width (log wordsize)
 	parameter [7:0] OPT_MAXBURST	= 8'hff,// Maximum burst length, minus 1
 	parameter [0:0] OPT_EXCLUSIVE	= 1,// Exclusive access allowed
-	parameter [0:0] OPT_NARROW_BURST = 0,// Narrow bursts allowed by default
+	parameter [0:0] OPT_NARROW_BURST = 1,// Narrow bursts allowed by default
 	parameter 	F_LGDEPTH	= 10,
 	parameter	[(F_LGDEPTH-1):0]	F_AXI_MAXSTALL = 3,
 	parameter	[(F_LGDEPTH-1):0]	F_AXI_MAXRSTALL= 3,
 	parameter	[(F_LGDEPTH-1):0]	F_AXI_MAXDELAY = 3,
-	localparam	F_OPT_BURSTS    = (OPT_MAXBURST != 0),
-	localparam [0:0]		F_OPT_ASSUME_RESET = 1'b1,
+	parameter [0:0]			F_OPT_READCHECK = 0,
+	localparam			F_OPT_BURSTS    = (OPT_MAXBURST != 0),
+	parameter [0:0]			F_OPT_ASSUME_RESET = 1'b1,
+	parameter [0:0]			F_OPT_NO_RESET = 1'b1,
 	localparam IW			= C_AXI_ID_WIDTH,
 	localparam DW			= C_AXI_DATA_WIDTH,
 	localparam AW			= C_AXI_ADDR_WIDTH
@@ -253,19 +255,20 @@ module faxi_slave #(
 	// If asserted, the reset must be asserted for a minimum of 16 clocks
 	initial	f_reset_length = 0;
 	always @(posedge i_clk)
-	if (i_axi_reset_n)
+	if (F_OPT_NO_RESET || i_axi_reset_n)
 		f_reset_length <= 0;
 	else if (!(&f_reset_length))
 		f_reset_length <= f_reset_length + 1'b1;
 
 	always @(posedge i_clk)
-	if ((f_past_valid)&&(!$past(i_axi_reset_n))&&(!$past(&f_reset_length)))
+	if ((f_past_valid)&& !F_OPT_NO_RESET
+			&& (!$past(i_axi_reset_n))&&(!$past(&f_reset_length)))
 		`SLAVE_ASSUME(!i_axi_reset_n);
 
 	//
 	// If the reset is not generated within this particular core, then it
 	// can be assumed if F_OPT_ASSUME_RESET is set
-	generate if (F_OPT_ASSUME_RESET)
+	generate if (F_OPT_ASSUME_RESET && !F_OPT_NO_RESET)
 	begin : ASSUME_RESET
 		always @(posedge i_clk)
 		if ((f_past_valid)&&(!$past(i_axi_reset_n))&&(!$past(&f_reset_length)))
@@ -275,7 +278,8 @@ module faxi_slave #(
 		if ((f_reset_length > 0)&&(f_reset_length < 4'hf))
 			assume(!i_axi_reset_n);
 
-	end else begin : ASSERT_RESET
+	end else if (!F_OPT_NO_RESET)
+	begin : ASSERT_RESET
 
 		always @(posedge i_clk)
 		if ((f_past_valid)&&(!$past(i_axi_reset_n))&&(!$past(&f_reset_length)))
@@ -655,32 +659,148 @@ module faxi_slave #(
 	always @(posedge i_clk)
 		`SLAVE_ASSERT(f_axi_rd_nbursts  < {(F_LGDEPTH){1'b1}});
 
+	////////////////////////////////////////////////////////////////////////
 	//
-	// Cannot have outstanding values if there aren't any outstanding
-	// bursts
-	always @(posedge i_clk)
-		assert(f_axi_wrid_nbursts <= f_axi_awr_nbursts);
-	always @(posedge i_clk)
-	if (f_axi_awr_nbursts == 0)
-		`SLAVE_ASSERT(f_axi_wr_pending == 0);
-	always @(posedge i_clk)
-	if (f_axi_wr_pending == 0)
-		assert(f_axi_wr_ckvalid == 0);
+	// Read Burst counting
 	//
-	//
+	always @(*)
+		f_axi_rd_checkid = r_axi_rd_checkid;
+
+	initial	f_axi_rdid_nbursts = 0;
+	initial	f_axi_rdid_outstanding = 0;
 	always @(posedge i_clk)
-		assert((f_axi_rd_nbursts == 0)==(f_axi_rd_outstanding==0));
-	always @(posedge i_clk)
+	if (!i_axi_reset_n)
+	begin
+		f_axi_rdid_nbursts <= 0;
+		f_axi_rdid_outstanding <= 0;
+	end else case({	(i_axi_arvalid&& i_axi_arready&&
+				(i_axi_arid == f_axi_rd_checkid)),
+			(i_axi_rvalid && i_axi_rready &&
+				(i_axi_rid == f_axi_rd_checkid)) })
+	2'b01: begin
+		if (i_axi_rlast)
+			f_axi_rdid_nbursts <= f_axi_rdid_nbursts - 1;
+		f_axi_rdid_outstanding <= f_axi_rdid_outstanding - 1;
+		end
+	2'b10: begin
+		f_axi_rdid_nbursts <= f_axi_rdid_nbursts + 1;
+		f_axi_rdid_outstanding <= f_axi_rdid_outstanding+i_axi_arlen+ 1;
+		end
+	2'b11: begin
+		if (!i_axi_rlast)
+			f_axi_rdid_nbursts <= f_axi_rdid_nbursts + 1;
+		f_axi_rdid_outstanding <= f_axi_rdid_outstanding + i_axi_arlen;
+		end
+	default: begin end
+	endcase
+
+
+	always @(*)
 		assert(f_axi_rd_nbursts <= f_axi_rd_outstanding);
+	always @(*)
+		assert((f_axi_rd_nbursts == 0)==(f_axi_rd_outstanding==0));
+	//
+	//
+	always @(*)
+		assert(f_axi_rdid_nbursts <= f_axi_rd_nbursts);
+	always @(*)
+	if (f_axi_rdid_nbursts == f_axi_rd_nbursts)
+		assert(f_axi_rdid_outstanding == f_axi_rd_outstanding);
+	always @(*)
+		assert(f_axi_rdid_outstanding <= f_axi_rd_outstanding);
+	always @(*)
+		assert(f_axi_rdid_nbursts <= f_axi_rdid_outstanding);
+	always @(*)
+		assert(f_axi_rd_nbursts - f_axi_rdid_nbursts
+				<= f_axi_rd_outstanding - f_axi_rdid_outstanding);
+	always @(*)
+		assert((f_axi_rdid_nbursts == 0)==(f_axi_rdid_outstanding==0));
+	always @(*)
+		assert((f_axi_rdid_nbursts == f_axi_rd_nbursts)
+			== (f_axi_rdid_outstanding == f_axi_rd_outstanding));
+	// ///////
+	always @(*)
+	if (f_axi_rd_ckvalid)
+	begin
+		assert(f_axi_rdid_nbursts >= f_axi_rdid_ckign_nbursts+1);
+		if (f_axi_rdid_ckign_nbursts+1 == f_axi_rdid_nbursts)
+			assert(f_axi_rdid_outstanding
+				== f_axi_rdid_ckign_outstanding+f_axi_rd_cklen);
+		assert(f_axi_rdid_outstanding >=
+			f_axi_rdid_ckign_outstanding
+			+ f_axi_rd_cklen
+			+ (f_axi_rdid_nbursts-(f_axi_rdid_ckign_nbursts+1)));
+	end
 
 	//
-	// Because we can't accept multiple AW* requests prior to the
-	// last WVALID && WLAST, the AWREADY signal *MUST* be high while
-	// waiting
+	// AXI read data channel signals
 	//
 	always @(posedge i_clk)
-	if (f_axi_wr_pending > 1)
-		`SLAVE_ASSERT(!i_axi_awready);
+	if (i_axi_rvalid)
+	begin
+		`SLAVE_ASSERT(f_axi_rd_outstanding > 0);
+		`SLAVE_ASSERT(f_axi_rd_nbursts > 0);
+		if (f_axi_rd_checkid == i_axi_rid)
+		begin
+			`SLAVE_ASSERT(f_axi_rdid_nbursts > 0);
+			`SLAVE_ASSERT(f_axi_rdid_outstanding > 0);
+		end else begin
+			`SLAVE_ASSERT(f_axi_rd_nbursts > f_axi_rdid_nbursts);
+			`SLAVE_ASSERT(f_axi_rd_outstanding
+					>  f_axi_rdid_outstanding);
+		end
+	end
+
+	always @(*)
+	if (i_axi_rvalid)
+	begin
+		if (f_axi_rd_outstanding == f_axi_rd_nbursts)
+			`SLAVE_ASSERT(i_axi_rlast);
+	
+		if (f_axi_rd_nbursts == 1)
+			`SLAVE_ASSERT(i_axi_rlast == (f_axi_rd_outstanding==1));
+			
+
+		if (f_axi_rd_checkid == i_axi_rid)
+		begin
+			if (f_axi_rdid_outstanding == f_axi_rdid_nbursts)
+				`SLAVE_ASSERT(i_axi_rlast);
+			if (f_axi_rdid_nbursts == 1)
+				`SLAVE_ASSERT(i_axi_rlast == (f_axi_rdid_outstanding == 1));
+		end else // if (f_axi_rd_checkid != i_axi_rid
+		begin
+			if ((f_axi_rd_outstanding - f_axi_rdid_outstanding)
+				 == (f_axi_rd_nbursts - f_axi_rdid_nbursts))
+				`SLAVE_ASSERT(i_axi_rlast);
+			if (f_axi_rd_nbursts - f_axi_rdid_nbursts == 1)
+				`SLAVE_ASSERT(i_axi_rlast == (f_axi_rd_outstanding - f_axi_rdid_outstanding == 1));
+		end
+	end
+
+	always @(*)
+	if (i_axi_rvalid && f_axi_rd_ckvalid && f_axi_rd_checkid == i_axi_rid)
+	begin
+
+		if (f_axi_rdid_ckign_nbursts > 0)
+		begin
+			if (f_axi_rdid_ckign_outstanding == f_axi_rdid_nbursts)
+				`SLAVE_ASSERT(i_axi_rlast);
+		end else
+			`SLAVE_ASSERT(i_axi_rlast == (f_axi_rd_cklen == 1));
+
+	end else if (i_axi_rvalid && f_axi_rd_ckvalid
+			&& f_axi_rd_checkid != i_axi_rid)
+	begin
+		`SLAVE_ASSERT(f_axi_rd_outstanding
+			- f_axi_rdid_ckign_outstanding
+			- f_axi_rd_cklen
+			- (f_axi_rdid_nbursts-f_axi_rdid_ckign_nbursts-1) > 1);
+	end
+
+	//
+	//
+
+
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -766,51 +886,26 @@ module faxi_slave #(
 	if (f_axi_wrid_nbursts == 0)
 		`SLAVE_ASSERT(!i_axi_bvalid || i_axi_bid != f_axi_wr_checkid);
 
+	//
+	// Cannot have outstanding values if there aren't any outstanding
+	// bursts
+	always @(posedge i_clk)
+		assert(f_axi_wrid_nbursts <= f_axi_awr_nbursts);
+	always @(posedge i_clk)
+	if (f_axi_awr_nbursts == 0)
+		`SLAVE_ASSERT(f_axi_wr_pending == 0);
+	always @(posedge i_clk)
+	if (f_axi_wr_pending == 0)
+		assert(f_axi_wr_ckvalid == 0);
 
 	//
-	// AXI read data channel signals
+	// Because we can't accept multiple AW* requests prior to the
+	// last WVALID && WLAST, the AWREADY signal *MUST* be high while
+	// waiting
 	//
 	always @(posedge i_clk)
-	if (i_axi_rvalid)
-	begin
-		`SLAVE_ASSERT(f_axi_rd_outstanding > 0);
-		`SLAVE_ASSERT(f_axi_rd_nbursts > 0);
-		if (f_axi_rd_checkid == i_axi_rid)
-		begin
-			`SLAVE_ASSERT(f_axi_rdid_nbursts > 0);
-			`SLAVE_ASSERT(f_axi_rdid_outstanding > 0);
-		end
-
-		if (!i_axi_rlast)
-		begin
-			`SLAVE_ASSERT(f_axi_rd_outstanding > 1);
-			if (f_axi_rd_checkid == i_axi_rid)
-				`SLAVE_ASSERT(f_axi_rdid_outstanding > 1);
-		end else begin
-			if (f_axi_rd_nbursts == 1)
-				`SLAVE_ASSERT(f_axi_rd_outstanding == 1);
-			if ((f_axi_rd_checkid == i_axi_rid)
-					&& (f_axi_rdid_nbursts == 1))
-				`SLAVE_ASSERT(f_axi_rdid_outstanding == 1);
-		end
-	end
-
-	always @(*)
-		assert(f_axi_rdid_outstanding <= f_axi_rd_outstanding);
-	always @(*)
-		assert(f_axi_rdid_nbursts <= f_axi_rd_nbursts);
-
-	always @(*)
-	if (f_axi_rdid_nbursts == f_axi_rd_nbursts)
-	begin
-		assert(f_axi_rdid_outstanding == f_axi_rd_outstanding);
-		if (i_axi_rvalid)
-			`SLAVE_ASSERT(i_axi_rid == f_axi_rd_checkid);
-	end
-
-	always @(*)
-	if (f_axi_rdid_nbursts == 0)
-		`SLAVE_ASSERT(!i_axi_rvalid || i_axi_rid != f_axi_rd_checkid);
+	if (f_axi_wr_pending > 1)
+		`SLAVE_ASSERT(!i_axi_awready);
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -1077,7 +1172,14 @@ module faxi_slave #(
 	assign	check_this_read_burst = (i_axi_reset_n
 				&& !f_axi_rd_ckvalid && f_axi_rd_check
 				&& i_axi_arid == f_axi_rd_checkid
-				&& axi_ard_req);
+				&& axi_ard_req
+				&& F_OPT_READCHECK);
+	wire	check_this_return;
+	assign	check_this_return = (i_axi_reset_n
+				&& f_axi_rd_ckvalid
+				&& i_axi_arid == f_axi_rd_checkid
+				&& (f_axi_rdid_ckign_nbursts == 0)
+				&& i_axi_rvalid);
 
 	always @(*)
 	if (!f_axi_rd_ckvalid || f_axi_rdid_ckign_nbursts != 0)
@@ -1104,9 +1206,10 @@ module faxi_slave #(
 			f_axi_rd_cksize  <= i_axi_arsize;
 			f_axi_rd_ckarlen <= i_axi_arlen;
 			f_axi_rd_ckaddr  <= i_axi_araddr;
-		end else if (f_axi_rd_ckvalid && f_axi_rdid_ckign_nbursts==0
-			&&(axi_rd_ack))
+		end else if (check_this_return && axi_rd_ack)
+		begin
 			f_axi_rd_ckaddr <= next_rd_addr;
+		end
 
 		if (!OPT_NARROW_BURST)
 		begin
@@ -1345,7 +1448,7 @@ module faxi_slave #(
 		always @(*)
 		if (i_axi_arvalid && i_axi_arlock)
 		begin
-			`SLAVE_ASSUME(i_axi_awlen < 16);
+			`SLAVE_ASSUME(i_axi_arlen < 16);
 			`SLAVE_ASSUME(ard_aligned);
 			`SLAVE_ASSUME(!i_axi_arcache[0]);
 		end
@@ -1388,41 +1491,15 @@ module faxi_slave #(
 	end endgenerate
 
 
-
 	////////////////////////////////////////////////////////////////////////
 	//
-	// Read Burst counting
+	// Packet read checking
 	//
-	always @(*)
-		f_axi_rd_checkid = r_axi_rd_checkid;
+	// Pick a read address request, and then track that one transaction
+	// through the system
+	//
+	////////////////////////////////////////////////////////////////////////
 
-	initial	f_axi_rdid_nbursts = 0;
-	initial	f_axi_rdid_outstanding = 0;
-	always @(posedge i_clk)
-	if (!i_axi_reset_n)
-	begin
-		f_axi_rdid_nbursts <= 0;
-		f_axi_rdid_outstanding <= 0;
-	end else case({	(i_axi_arvalid&& i_axi_arready&&
-				(i_axi_arid == f_axi_rd_checkid)),
-			(i_axi_rvalid && i_axi_rready &&
-				(i_axi_rid == f_axi_rd_checkid)) })
-	2'b01: begin
-		if (i_axi_rlast)
-			f_axi_rdid_nbursts <= f_axi_rdid_nbursts - 1;
-		f_axi_rdid_outstanding <= f_axi_rdid_outstanding - 1;
-		end
-	2'b10: begin
-		f_axi_rdid_nbursts <= f_axi_rdid_nbursts + 1;
-		f_axi_rdid_outstanding <= f_axi_rdid_outstanding+i_axi_arlen+ 1;
-		end
-	2'b11: begin
-		if (!i_axi_rlast)
-			f_axi_rdid_nbursts <= f_axi_rdid_nbursts + 1;
-		f_axi_rdid_outstanding <= f_axi_rdid_outstanding + i_axi_arlen;
-		end
-	default: begin end
-	endcase
 
 	initial	f_axi_rdid_ckign_nbursts = 0;
 	initial	f_axi_rdid_ckign_outstanding = 0;
@@ -1453,23 +1530,33 @@ module faxi_slave #(
 				&& i_axi_rid == f_axi_rd_checkid) ? 1:0);
 
 			f_axi_rd_cklen <= i_axi_arlen + 1;
+		end else if (check_this_return && i_axi_rready)
+		begin
+			`SLAVE_ASSERT(i_axi_rlast == (f_axi_rd_cklen == 1));
+			f_axi_rd_cklen <= f_axi_rd_cklen - 1;
+			if (i_axi_rlast)
+				f_axi_rd_ckvalid <= 1'b0;
 		end else if (f_axi_rd_ckvalid && i_axi_rvalid && i_axi_rready
 					&& i_axi_rid == f_axi_rd_checkid)
 		begin
-			if (f_axi_rdid_ckign_nbursts > 0)
-			begin
-				if (i_axi_rlast)
-					f_axi_rdid_ckign_nbursts <= f_axi_rdid_ckign_nbursts-1;
-				f_axi_rdid_ckign_outstanding <= f_axi_rdid_ckign_outstanding-1;
-			end else begin
-				`SLAVE_ASSERT(i_axi_rlast == (f_axi_rd_cklen == 1));
-				f_axi_rd_cklen <= f_axi_rd_cklen - 1;
-				if (i_axi_rlast)
-					f_axi_rd_ckvalid <= 1'b0;
-			end
+			if (i_axi_rlast)
+				f_axi_rdid_ckign_nbursts <= f_axi_rdid_ckign_nbursts-1;
+			f_axi_rdid_ckign_outstanding <= f_axi_rdid_ckign_outstanding-1;
+			if (f_axi_rdid_ckign_nbursts == f_axi_rdid_ckign_outstanding && !i_axi_rlast)
+				`SLAVE_ASSERT(i_axi_rid != f_axi_rd_checkid);
 		end
 	end
 
+	always @(*)
+	if (i_axi_rvalid && f_axi_rd_ckvalid && i_axi_rid == f_axi_rd_checkid)
+	begin
+		if (f_axi_rdid_ckign_nbursts == 1)
+			`SLAVE_ASSERT(i_axi_rlast == (f_axi_rdid_ckign_outstanding==1));
+		if ((f_axi_rdid_ckign_nbursts == f_axi_rdid_ckign_outstanding)
+			&&(f_axi_rdid_ckign_nbursts > 0))
+			`SLAVE_ASSERT(i_axi_rlast);
+	end
+	
 	always @(*)
 	if (f_axi_rdid_outstanding == 0)
 		assert(f_axi_rdid_nbursts == 0);
@@ -1502,6 +1589,28 @@ module faxi_slave #(
 	always @(*)
 	if (f_axi_rd_ckvalid)
 		assert(f_axi_rd_cklen > 0);
+
+	always @(*)
+	if (f_axi_rd_ckvalid)
+		`SLAVE_ASSERT(f_axi_rdid_ckign_nbursts +1 <= f_axi_rdid_nbursts);
+
+	always @(*)
+	if (f_axi_rd_ckvalid)
+		`SLAVE_ASSERT(f_axi_rdid_ckign_outstanding + f_axi_rd_cklen
+				<= f_axi_rdid_outstanding);
+
+	always @(*)
+	if ((f_axi_rd_ckvalid)&&(f_axi_rdid_ckign_nbursts +1 == f_axi_rdid_nbursts))
+		`SLAVE_ASSERT(f_axi_rdid_ckign_outstanding + f_axi_rd_cklen
+				== f_axi_rdid_outstanding);
+
+	always @(*)
+	if (!F_OPT_READCHECK)
+	begin
+		assert(f_axi_rd_cklen == 0);
+		assert(f_axi_rdid_ckign_nbursts == 0);
+		assert(f_axi_rdid_ckign_outstanding == 0);
+	end
 `undef	SLAVE_ASSUME
 `undef	SLAVE_ASSERT
 endmodule
