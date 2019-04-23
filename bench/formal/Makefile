@@ -42,7 +42,7 @@
 ################################################################################
 ##
 ##
-TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar axilxbar demofull xlnxfull # wbm2axisp axim2wbsp
+TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar axilxbar demofull xlnxfull axisafety # wbm2axisp axim2wbsp
 .PHONY: $(TESTS)
 all: $(TESTS)
 RTL := ../../rtl
@@ -71,6 +71,7 @@ WBXBAR1x8  := wbxbar1x8
 WBXBAR4x1  := wbxbar4x1
 DEMOFULL   := demofull
 AXIL       := faxil_master.v faxil_slave.v
+AXISAFETY  := axisafety
 WB         := fwb_master.v fwb_slave.v
 AXI        := faxi_master.v faxi_slave.v
 
@@ -99,8 +100,9 @@ $(WRLITE)_prf/PASS: $(WRLITE).sby $(RTL)/$(WRLITE).v $(WB)
 $(WRLITE)_cvr/PASS: $(WRLITE).sby $(RTL)/$(WRLITE).v $(WB)
 	sby -f $(WRLITE).sby cvr
 
+.PHONY: $(AXLITE)
 $(AXLITE): $(AXLITE)_prf/PASS $(AXLITE)_cvr/PASS
-AXLITE_DEPS := $(RTL)/$(RDLITE).v $(RTL)/$(WRLITE).v \
+AXLITE_DEPS := $(RTL)/$(RDLITE).v $(RTL)/$(WRLITE).v			\
 	$(RTL)/$(WBARB).v fwb_master.v faxil_slave.v			\
 	$(AXLITE).sby $(RTL)/$(AXLITE).v				\
 	$(RDLITE)_prf/PASS $(RDLITE)_cvr/PASS				\
@@ -122,6 +124,7 @@ $(WB2LITE)_cvr/PASS: $(RTL)/$(WB2LITE).v
 $(WB2LITE)_cvr/PASS: $(WB2LITE).sby fwb_slave.v faxil_master.v
 	sby -f $(WB2LITE).sby cvr
 
+.PHONY: $(DEMOAXI)
 $(DEMOAXI): $(DEMOAXI)_prf/PASS $(DEMOAXI)_cvr/PASS
 $(DEMOAXI)_prf/PASS: $(RTL)/$(DEMOAXI).v $(DEMOAXI).sby faxil_slave.v
 	sby -f $(DEMOAXI).sby prf
@@ -347,11 +350,21 @@ $(WBXBAR4x1): wbxbar_prf4x1_cheapkos/PASS
 wbxbar_prf4x1_cheapkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x1_cheapkos
 
+.PHONY: $(DEMOFULL)
 $(DEMOFULL): $(DEMOFULL)_prf/PASS $(DEMOFULL)_cvr/PASS
 $(DEMOFULL)_prf/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
 	sby -f $(DEMOFULL).sby prf
 $(DEMOFULL)_cvr/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
 	sby -f $(DEMOFULL).sby cvr
+
+.PHONY: $(AXISAFETY)
+$(AXISAFETY): $(AXISAFETY)_prf/PASS $(AXISAFETY)_fault/PASS $(AXISAFETY)_cvr/PASS
+$(AXISAFETY)_prf/PASS:   $(AXISAFETY).sby $(RTL)/$(AXISAFETY).v $(AXI)
+	sby -f $(AXISAFETY).sby prf
+$(AXISAFETY)_fault/PASS: $(AXISAFETY).sby $(RTL)/$(AXISAFETY).v $(AXI)
+	sby -f $(AXISAFETY).sby fault
+$(AXISAFETY)_cvr/PASS:   $(AXISAFETY).sby $(RTL)/$(AXISAFETY).v $(AXI)
+	sby -f $(AXISAFETY).sby cvr
 
 .PHONY: clean
 clean:
