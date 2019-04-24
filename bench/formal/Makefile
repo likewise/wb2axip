@@ -351,11 +351,39 @@ wbxbar_prf4x1_cheapkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x1_cheapkos
 
 .PHONY: $(DEMOFULL)
-$(DEMOFULL): $(DEMOFULL)_prf/PASS $(DEMOFULL)_cvr/PASS
+$(DEMOFULL): $(DEMOFULL)_prf/PASS     $(DEMOFULL)_prfn/PASS
+$(DEMOFULL): $(DEMOFULL)_prf8/PASS    $(DEMOFULL)_prfn8/PASS
+$(DEMOFULL): $(DEMOFULL)_prf16/PASS   $(DEMOFULL)_prfn16/PASS
+$(DEMOFULL): $(DEMOFULL)_prf64/PASS   $(DEMOFULL)_prfn64/PASS
+$(DEMOFULL): $(DEMOFULL)_prf128/PASS  $(DEMOFULL)_prfn128/PASS
+$(DEMOFULL): $(DEMOFULL)_prf256/PASS  $(DEMOFULL)_prfn256/PASS
+$(DEMOFULL): $(DEMOFULL)_cvr/PASS
 $(DEMOFULL)_prf/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
 	sby -f $(DEMOFULL).sby prf
 $(DEMOFULL)_cvr/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
 	sby -f $(DEMOFULL).sby cvr
+$(DEMOFULL)_prfn/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prfn
+$(DEMOFULL)_prf8/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prf8
+$(DEMOFULL)_prfn8/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prfn8
+$(DEMOFULL)_prf16/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prf16
+$(DEMOFULL)_prfn16/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prfn16
+$(DEMOFULL)_prf64/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prf64
+$(DEMOFULL)_prfn64/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prfn64
+$(DEMOFULL)_prf128/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prf128
+$(DEMOFULL)_prfn128/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prfn128
+$(DEMOFULL)_prfn256/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prf256
+$(DEMOFULL)_prf256/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+	sby -f $(DEMOFULL).sby prfn256
 
 .PHONY: $(AXISAFETY)
 $(AXISAFETY): $(AXISAFETY)_prf/PASS $(AXISAFETY)_fault/PASS $(AXISAFETY)_cvr/PASS

@@ -36,6 +36,7 @@ smtbmc boolector
 read -formal demofull.v
 read -formal faxi_slave.v
 read -formal faxi_addr.v
+read -formal axi_addr.v
 dw8:    chparam -set C_S_AXI_DATA_WIDTH    8 demofull
 dw16:   chparam -set C_S_AXI_DATA_WIDTH   16 demofull
 dw32:   chparam -set C_S_AXI_DATA_WIDTH   32 demofull
@@ -52,5 +53,6 @@ prep -top demofull
 
 [files]
 ../../rtl/demofull.v
+../../rtl/axi_addr.v
 faxi_slave.v
 faxi_addr.v
