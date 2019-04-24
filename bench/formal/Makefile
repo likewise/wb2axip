@@ -42,7 +42,7 @@
 ################################################################################
 ##
 ##
-TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar axilxbar demofull xlnxfull axisafety # wbm2axisp axim2wbsp
+TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar axilxbar wbp2classic demofull xlnxfull axisafety # wbm2axisp axim2wbsp
 .PHONY: $(TESTS)
 all: $(TESTS)
 RTL := ../../rtl
@@ -69,10 +69,12 @@ WBXBAR     := wbxbar
 WBXBAR4x8  := wbxbar4x8
 WBXBAR1x8  := wbxbar1x8
 WBXBAR4x1  := wbxbar4x1
+WBP2CLASSIC:= wbp2classic
 DEMOFULL   := demofull
-AXIL       := faxil_master.v faxil_slave.v
 AXISAFETY  := axisafety
-WB         := fwb_master.v fwb_slave.v
+AXIL       := faxil_master.v faxil_slave.v
+WB         := fwb_master.v  fwb_slave.v
+WBC        := fwbc_master.v fwbc_slave.v
 AXI        := faxi_master.v faxi_slave.v
 
 .PHONY: $(WBARB) $(WB2AXI) $(RDLITE) $(WRLITE) $(AXLITE) $(WB2LITE) $(DEMOAXI)
@@ -349,6 +351,13 @@ wbxbar_prf4x1_lpkos/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 $(WBXBAR4x1): wbxbar_prf4x1_cheapkos/PASS
 wbxbar_prf4x1_cheapkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x1_cheapkos
+
+.PHONY: $(WBP2CLASSIC)
+$(WBP2CLASSIC): $(WBP2CLASSIC)_prf/PASS $(WBP2CLASSIC)_cvr/PASS
+$(WBP2CLASSIC)_prf/PASS:
+	sby -f $(WBP2CLASSIC).sby prf
+$(WBP2CLASSIC)_cvr/PASS:
+	sby -f $(WBP2CLASSIC).sby cvr
 
 .PHONY: $(DEMOFULL)
 $(DEMOFULL): $(DEMOFULL)_prf/PASS     $(DEMOFULL)_prfn/PASS
