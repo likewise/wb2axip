@@ -177,6 +177,16 @@ module	fwbc_slave(i_clk, i_reset,
 	always @(*)
 		`SLAVE_ASSERT((!i_wb_ack)||(!i_wb_err));
 
+	// Once (ACK|ERR) is set, it must remain set unto `STB` is dropped
+	always @(*)
+	if (f_past_valid && ($past(i_wb_ack|i_wb_err)&&($past(i_wb_stb))
+			&&(i_wb_stb))
+	begin
+		`SLAVE_ASSERT($stable(i_wb_ack);
+		`SLAVE_ASSERT($stable(i_wb_err);
+		`SLAVE_ASSERT($stable(i_wb_idata);
+	end
+
 	generate if (F_MAX_DELAY > 0)
 	begin : DELAYCOUNT
 		//

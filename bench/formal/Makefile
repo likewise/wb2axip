@@ -70,6 +70,7 @@ WBXBAR4x8  := wbxbar4x8
 WBXBAR1x8  := wbxbar1x8
 WBXBAR4x1  := wbxbar4x1
 WBP2CLASSIC:= wbp2classic
+WBC2PIPELIN:= wbc2pipeline
 DEMOFULL   := demofull
 AXISAFETY  := axisafety
 AXIL       := faxil_master.v faxil_slave.v
@@ -358,6 +359,13 @@ $(WBP2CLASSIC)_prf/PASS:
 	sby -f $(WBP2CLASSIC).sby prf
 $(WBP2CLASSIC)_cvr/PASS:
 	sby -f $(WBP2CLASSIC).sby cvr
+
+.PHONY: $(WBC2PIPELIN)
+$(WBC2PIPELIN): $(WBC2PIPELIN)_prf/PASS $(WBC2PIPELIN)_cvr/PASS
+$(WBC2PIPELIN)_prf/PASS:
+	sby -f $(WBC2PIPELIN).sby prf
+$(WBC2PIPELIN)_cvr/PASS:
+	sby -f $(WBC2PIPELIN).sby cvr
 
 .PHONY: $(DEMOFULL)
 $(DEMOFULL): $(DEMOFULL)_prf/PASS     $(DEMOFULL)_prfn/PASS
