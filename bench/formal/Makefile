@@ -77,7 +77,7 @@ AXISAFETY  := axisafety
 AXIL       := faxil_master.v faxil_slave.v
 WB         := fwb_master.v   fwb_slave.v
 WBC        := fwbc_master.v  fwbc_slave.v
-AXI        := faxi_master.v  faxi_slave.v
+AXI        := faxi_master.v  faxi_slave.v  faxi_addr.v
 AXIS       := faxis_master.v faxis_slave.v
 
 .PHONY: $(WBARB) $(WB2AXI) $(RDLITE) $(WRLITE) $(AXLITE) $(WB2LITE) $(DEMOAXI)
@@ -377,31 +377,31 @@ $(DEMOFULL): $(DEMOFULL)_prf64/PASS   $(DEMOFULL)_prfn64/PASS
 $(DEMOFULL): $(DEMOFULL)_prf128/PASS  $(DEMOFULL)_prfn128/PASS
 $(DEMOFULL): $(DEMOFULL)_prf256/PASS  $(DEMOFULL)_prfn256/PASS
 $(DEMOFULL): $(DEMOFULL)_cvr/PASS
-$(DEMOFULL)_prf/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prf/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prf
-$(DEMOFULL)_cvr/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_cvr/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby cvr
-$(DEMOFULL)_prfn/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prfn/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prfn
-$(DEMOFULL)_prf8/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prf8/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prf8
-$(DEMOFULL)_prfn8/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prfn8/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prfn8
-$(DEMOFULL)_prf16/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prf16/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prf16
-$(DEMOFULL)_prfn16/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prfn16/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prfn16
-$(DEMOFULL)_prf64/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prf64/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prf64
-$(DEMOFULL)_prfn64/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prfn64/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prfn64
-$(DEMOFULL)_prf128/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prf128/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prf128
-$(DEMOFULL)_prfn128/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prfn128/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prfn128
-$(DEMOFULL)_prfn256/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prfn256/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prf256
-$(DEMOFULL)_prf256/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI)
+$(DEMOFULL)_prf256/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_addr.v
 	sby -f $(DEMOFULL).sby prfn256
 
 .PHONY: $(AXISAFETY)
