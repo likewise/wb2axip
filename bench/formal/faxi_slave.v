@@ -577,7 +577,7 @@ module faxi_slave #(
 		begin // Write word applies to the last burst
 			`SLAVE_ASSUME(f_axi_wr_pending == 1);
 			`SLAVE_ASSUME(i_axi_wlast);
-			`SLAVE_ASSUME(axi_wr_req);
+			`SLAVE_ASSERT(!i_axi_awready || i_axi_wready);
 		end else begin
 			// Must be associated with the new burst
 			// In this case, check WLAST against the *incoming*
@@ -751,6 +751,8 @@ module faxi_slave #(
 		end
 	end
 
+	always @(posedge i_clk)
+		assume(f_axi_rd_outstanding <= { f_axi_rd_nbursts[F_LGDEPTH-9:0], 8'h0 });
 	always @(*)
 	if (i_axi_rvalid)
 	begin
@@ -864,27 +866,22 @@ module faxi_slave #(
 	//
 	// AXI write response channel
 	//
-	always @(posedge i_clk)
+	always @(*)
 	if (i_axi_bvalid)
 	begin
 		`SLAVE_ASSERT(f_axi_awr_nbursts > 0);
 		`SLAVE_ASSERT(f_axi_awr_nbursts > 1 || f_axi_wr_pending == 0);
+
 		if (f_axi_wrid_nbursts == 0)
 			`SLAVE_ASSERT(i_axi_bid != f_axi_wr_checkid);
-		else if ((f_axi_wrid_nbursts == 1)&&(f_axi_wr_ckvalid))
+		if ((f_axi_wrid_nbursts == 1)&&(f_axi_wr_ckvalid))
 			`SLAVE_ASSERT(i_axi_bid != f_axi_wr_checkid);
-	end
-
-	always @(*)
-	if (f_axi_wrid_nbursts == f_axi_awr_nbursts)
-	begin
-		if (i_axi_bvalid)
+		if (f_axi_wrid_nbursts == f_axi_awr_nbursts)
+			`SLAVE_ASSERT(i_axi_bid == f_axi_wr_checkid);
+		if ((f_axi_wrid_nbursts == f_axi_awr_nbursts-1)
+				&&(f_axi_wr_pending > 0)&&(!f_axi_wr_ckvalid))
 			`SLAVE_ASSERT(i_axi_bid == f_axi_wr_checkid);
 	end
-
-	always @(*)
-	if (f_axi_wrid_nbursts == 0)
-		`SLAVE_ASSERT(!i_axi_bvalid || i_axi_bid != f_axi_wr_checkid);
 
 	//
 	// Cannot have outstanding values if there aren't any outstanding
