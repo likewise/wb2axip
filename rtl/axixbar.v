@@ -455,6 +455,12 @@ module	axixbar #(
 					slave_awaccepts[N] = 1'b0;
 				if ((s_axi_wvalid[mwindex[N]] && !s_axi_wready[mwindex[N]]))
 					slave_awaccepts[N] = 1'b0;
+			end else if (M_AXI_BVALID[N] && !M_AXI_BREADY[N])
+			begin
+				// Can't accept an write address channel
+				// value if the B* channel is stalled, lest
+				// we lose the ID of the transaction
+				slave_awaccepts[N] = 1'b0;
 			end
 			// ERRORs are always accepted
 			//	back pressure is handled in the write side
@@ -2676,7 +2682,7 @@ module	axixbar #(
 			.i_axi_wlast( S_AXI_WLAST[ M]),
 			.i_axi_wvalid(S_AXI_WVALID[M]),
 			//
-			.i_axi_bresp( S_AXI_BID[   M*IW +: IW]),
+			.i_axi_bid(   S_AXI_BID[   M*IW +: IW]),
 			.i_axi_bresp( S_AXI_BRESP[ M*2 +: 2]),
 			.i_axi_bvalid(S_AXI_BVALID[M]),
 			.i_axi_bready(S_AXI_BREADY[M]),

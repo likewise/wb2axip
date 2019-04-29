@@ -541,11 +541,15 @@ module faxi_slave #(
 			f_axi_wr_pending <= i_axi_awlen+1;
 		else begin
 			f_axi_wr_pending <= i_axi_awlen;
-			f_axi_wr_ckvalid <= 0;
+			if (i_axi_awlen == 0)
+				f_axi_wr_ckvalid <= 0;
 		end end
 	default: begin end
 	endcase
 
+	always @(*)
+	if (f_axi_wr_ckvalid)
+		assert((f_axi_wrid_nbursts > 0)&&(f_axi_wr_pending > 0));
 	//
 	// Insist that no WVALID value show up prior to a AWVALID value.  The
 	// address *MUST* come first.  Further, while waiting for the write
@@ -866,21 +870,27 @@ module faxi_slave #(
 	//
 	// AXI write response channel
 	//
+	reg	[(F_LGDEPTH-1):0]	f_wr_completed,
+					f_wrid_completed;
+	always @(*)
+	begin
+		f_wr_completed = f_axi_awr_nbursts-((f_axi_wr_pending>0) ? 1:0);
+		f_wrid_completed = f_axi_wrid_nbursts
+				- (f_axi_wr_ckvalid ? 1:0);
+
+		assert(f_axi_wrid_nbursts <= f_axi_awr_nbursts);
+		assert(f_wrid_completed <= f_wr_completed);
+	end
+
 	always @(*)
 	if (i_axi_bvalid)
 	begin
-		`SLAVE_ASSERT(f_axi_awr_nbursts > 0);
-		`SLAVE_ASSERT(f_axi_awr_nbursts > 1 || f_axi_wr_pending == 0);
+		`SLAVE_ASSERT(f_wr_completed > 0);
 
-		if (f_axi_wrid_nbursts == 0)
-			`SLAVE_ASSERT(i_axi_bid != f_axi_wr_checkid);
-		if ((f_axi_wrid_nbursts == 1)&&(f_axi_wr_ckvalid))
-			`SLAVE_ASSERT(i_axi_bid != f_axi_wr_checkid);
-		if (f_axi_wrid_nbursts == f_axi_awr_nbursts)
-			`SLAVE_ASSERT(i_axi_bid == f_axi_wr_checkid);
-		if ((f_axi_wrid_nbursts == f_axi_awr_nbursts-1)
-				&&(f_axi_wr_pending > 0)&&(!f_axi_wr_ckvalid))
-			`SLAVE_ASSERT(i_axi_bid == f_axi_wr_checkid);
+		if (i_axi_bid == f_axi_wr_checkid)
+			`SLAVE_ASSERT(f_wrid_completed > 0);
+		else // if (i_axi_bid != f_axi_wr_checkid)
+			`SLAVE_ASSERT(f_wr_completed - f_wrid_completed > 0);
 	end
 
 	//
