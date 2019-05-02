@@ -871,6 +871,45 @@ module demofull #(
 	always @(*)
 		cover(S_AXI_ARREADY && f_rd_cvr_valid && f_axi_rd_nbursts == 0);
 
+	//
+	// Generate cover statements associated with multiple successive bursts
+	//
+	// These will be useful for demonstrating the throughput of the core.
+	//
+	reg	[4:0]	f_dbl_rd_count, f_dbl_wr_count;
+
+	initial	f_dbl_wr_count = 0;
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN)
+		f_dbl_wr_count = 0;
+	else if (S_AXI_AWVALID && S_AXI_AWREADY && S_AXI_AWLEN == 3)
+	begin
+		if (!(&f_dbl_wr_count))
+			f_dbl_wr_count <= f_dbl_wr_count + 1;
+	end
+
+	always @(*)
+		cover(!S_AXI_ARESETN && (f_dbl_wr_count > 3)
+			&&(!S_AXI_AWVALID && !S_AXI_WVALID && !S_AXI_BVALID)
+			&& (f_axi_awr_nbursts == 0)
+			&& (f_axi_wr_pending == 0));
+
+	initial	f_dbl_rd_count = 0;
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN)
+		f_dbl_rd_count = 0;
+	else if (S_AXI_ARVALID && S_AXI_ARREADY && S_AXI_ARLEN == 3)
+	begin
+		if (!(&f_dbl_rd_count))
+			f_dbl_rd_count <= f_dbl_rd_count + 1;
+	end
+
+	always @(*)
+		cover(!S_AXI_ARESETN && (f_dbl_rd_count > 3)
+			&& (f_axi_rd_nbursts == 0)
+			&& !S_AXI_ARVALID && !S_AXI_RVALID);
+
+
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Assumptions necessary to pass a formal check
