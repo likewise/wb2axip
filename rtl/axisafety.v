@@ -77,6 +77,9 @@
 //	the latency involved with using this core is a minimum of two extra
 //	clocks beyond the latency user slave core.
 //
+//	Maximum write latency: N+3 clocks for a burst of N values
+//	Maximum read latency:  N+3 clocks for a burst of N values
+//
 // Faults detected:
 //
 //	Write channel:
@@ -690,7 +693,7 @@ module axisafety #(
 	// is our signal determining if the write channel is disconnected.
 	//
 	// Most of this work is determined within faulty_write_return above.
-	// Here we do just a bit more: 
+	// Here we do just a bit more:
 	initial	o_write_fault = 0;
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
@@ -915,29 +918,6 @@ module axisafety #(
 				faulty_read_return = 1;
 			if (rfifo_penultimate && S_AXI_RVALID && (r_rvalid || !M_AXI_RLAST))
 				faulty_read_return = 1;
-/*
-			if (rfifo_counter == (S_AXI_RVALID ? 1:0)
-					+ (r_rvalid ? 1:0))
-				// It is a fault to return data when all
-				// of the data has already been returned, and
-				// is now waiting in the pipeline to be
-				// consumed
-				faulty_read_return = 1;
-*/
-/*			if (M_AXI_RLAST != ((rfifo_counter
-						- (S_AXI_RVALID ? 1:0)
-						- (r_rvalid ? 1:0)) == 1))
-				// It is a fault to set RLAST for anything
-				// other than the last value.  This is a bit
-				// of a trick to check for, since there may
-				// already be items in the pipeline--as
-				// calculated above.
-				faulty_read_return = 1;
-			if (!S_AXI_RVALID && rfifo_last && !M_AXI_RLAST)
-				o_read_fault <= 1;
-			if (rfifo_penultimate && S_AXI_RVALID && !M_AXI_RLAST)
-				o_read_fault <= 1;
-*/
 		end
 	end
 
@@ -1011,7 +991,7 @@ module axisafety #(
 	if (S_AXI_ARVALID && S_AXI_ARREADY)
 		rfifo_id <= S_AXI_ARID;
 
-	// 
+	//
 	// Count the number of outstanding read elements.  This is the number
 	// of read returns we still expect--from the upstream perspective.  The
 	// downstream perspective will be off by both what's waiting for
@@ -1160,7 +1140,7 @@ module axisafety #(
 					f_axi_rdid_ckign_outstanding;
 
 	faxi_slave	#(
-		.F_AXI_MAXSTALL((F_OPT_FAULTLESS) ? 9 : 0),
+		.F_AXI_MAXSTALL((F_OPT_FAULTLESS) ? 12 : 0),
 		.F_AXI_MAXDELAY(OPT_TIMEOUT+4),
 		.F_AXI_MAXRSTALL(3),
 		.C_AXI_ID_WIDTH(C_S_AXI_ID_WIDTH),
@@ -1199,7 +1179,7 @@ module axisafety #(
 	//
 	//
 		// Response ID tag. This signal is the ID tag of the
-    		// write response.
+		// write response.
 		.i_axi_bid(S_AXI_BID),
 		.i_axi_bresp(S_AXI_BRESP),
 		.i_axi_bvalid(S_AXI_BVALID),
@@ -1213,35 +1193,38 @@ module axisafety #(
 		// tag for the read address group of signals.
 		.i_axi_arid(S_AXI_ARID),
 		// Read address. This signal indicates the initial
-    		// address of a read burst transaction.
+		// address of a read burst transaction.
 		.i_axi_araddr(S_AXI_ARADDR),
-		// Burst length. The burst length gives the exact number of transfers in a burst
+		// Burst length. The burst length gives the exact number of
+		// transfers in a burst
 		.i_axi_arlen(S_AXI_ARLEN),
-		// Burst size. This signal indicates the size of each transfer in the burst
+		// Burst size. This signal indicates the size of each
+		// transfer in the burst
 		.i_axi_arsize(S_AXI_ARSIZE),
-		// Burst type. The burst type and the size information, 
-    		// determine how the address for each transfer within the burst is calculated.
+		// Burst type. The burst type and the size information,
+		// determine how the address for each transfer within the
+		// burst is calculated.
 		.i_axi_arburst(S_AXI_ARBURST),
 		// Lock type. Provides additional information about the
-    		// atomic characteristics of the transfer.
+		// atomic characteristics of the transfer.
 		.i_axi_arlock(S_AXI_ARLOCK),
 		// Memory type. This signal indicates how transactions
-    		// are required to progress through a system.
+		// are required to progress through a system.
 		.i_axi_arcache(S_AXI_ARCACHE),
 		// Protection type. This signal indicates the privilege
-    		// and security level of the transaction, and whether
-    		// the transaction is a data access or an instruction access.
+		// and security level of the transaction, and whether
+		// the transaction is a data access or an instruction access.
 		.i_axi_arprot(S_AXI_ARPROT),
 		// Quality of Service, QoS identifier sent for each
-    		// read transaction.
+		// read transaction.
 		.i_axi_arqos(S_AXI_ARQOS),
 		// Write address valid. This signal indicates that
-    		// the channel is signaling valid read address and
-    		// control information.
+		// the channel is signaling valid read address and
+		// control information.
 		.i_axi_arvalid(S_AXI_ARVALID),
 		// Read address ready. This signal indicates that
-    		// the slave is ready to accept an address and associated
-    		// control signals.
+		// the slave is ready to accept an address and associated
+		// control signals.
 		.i_axi_arready(S_AXI_ARREADY),
 	//
 	//
@@ -1254,16 +1237,16 @@ module axisafety #(
 		// Read Data
 		.i_axi_rdata(S_AXI_RDATA),
 		// Read response. This signal indicates the status of
-    		// the read transfer.
+		// the read transfer.
 		.i_axi_rresp(S_AXI_RRESP),
 		// Read last. This signal indicates the last transfer
-    		// in a read burst.
+		// in a read burst.
 		.i_axi_rlast(S_AXI_RLAST),
 		// Read valid. This signal indicates that the channel
-    		// is signaling the required read data.
+		// is signaling the required read data.
 		.i_axi_rvalid(S_AXI_RVALID),
 		// Read ready. This signal indicates that the master can
-    		// accept the read data and response information.
+		// accept the read data and response information.
 		.i_axi_rready(S_AXI_RREADY),
 		//
 		// Formal outputs
@@ -1497,7 +1480,7 @@ module axisafety #(
 		wire	[C_S_AXI_ID_WIDTH-1:0]	fm_axi_wr_checkid;
 		wire				fm_axi_wr_ckvalid;
 		wire	[F_LGDEPTH-1:0]		fm_axi_wrid_nbursts;
-	
+
 		//
 		wire	[C_S_AXI_ADDR_WIDTH-1:0] fm_axi_wr_addr;
 		wire	[7:0]			fm_axi_wr_incr;
@@ -1559,7 +1542,7 @@ module axisafety #(
 	//
 	//
 		// Response ID tag. This signal is the ID tag of the
-    		// write response.
+		// write response.
 		.i_axi_bid(M_AXI_BID),
 		.i_axi_bresp(M_AXI_BRESP),
 		.i_axi_bvalid(M_AXI_BVALID),
@@ -1569,61 +1552,27 @@ module axisafety #(
 		//
 		// Read address channel
 		//
-		// Read address ID. This signal is the identification
-		// tag for the read address group of signals.
 		.i_axi_arid(M_AXI_ARID),
-		// Read address. This signal indicates the initial
-    		// address of a read burst transaction.
 		.i_axi_araddr(M_AXI_ARADDR),
-		// Burst length. The burst length gives the exact number of transfers in a burst
 		.i_axi_arlen(M_AXI_ARLEN),
-		// Burst size. This signal indicates the size of each transfer in the burst
 		.i_axi_arsize(M_AXI_ARSIZE),
-		// Burst type. The burst type and the size information, 
-    		// determine how the address for each transfer within the burst is calculated.
 		.i_axi_arburst(M_AXI_ARBURST),
-		// Lock type. Provides additional information about the
-    		// atomic characteristics of the transfer.
 		.i_axi_arlock(M_AXI_ARLOCK),
-		// Memory type. This signal indicates how transactions
-    		// are required to progress through a system.
 		.i_axi_arcache(M_AXI_ARCACHE),
-		// Protection type. This signal indicates the privilege
-    		// and security level of the transaction, and whether
-    		// the transaction is a data access or an instruction access.
 		.i_axi_arprot(M_AXI_ARPROT),
-		// Quality of Service, QoS identifier sent for each
-    		// read transaction.
 		.i_axi_arqos(M_AXI_ARQOS),
-		// Write address valid. This signal indicates that
-    		// the channel is signaling valid read address and
-    		// control information.
 		.i_axi_arvalid(M_AXI_ARVALID),
-		// Read address ready. This signal indicates that
-    		// the slave is ready to accept an address and associated
-    		// control signals.
 		.i_axi_arready(M_AXI_ARREADY),
 	//
 	//
 		//
 		// Read data return channel
 		//
-		// Read ID tag. This signal is the identification tag
-		// for the read data group of signals generated by the slave.
 		.i_axi_rid(M_AXI_RID),
-		// Read Data
 		.i_axi_rdata(M_AXI_RDATA),
-		// Read response. This signal indicates the status of
-    		// the read transfer.
 		.i_axi_rresp(M_AXI_RRESP),
-		// Read last. This signal indicates the last transfer
-    		// in a read burst.
 		.i_axi_rlast(M_AXI_RLAST),
-		// Read valid. This signal indicates that the channel
-    		// is signaling the required read data.
 		.i_axi_rvalid(M_AXI_RVALID),
-		// Read ready. This signal indicates that the master can
-    		// accept the read data and response information.
 		.i_axi_rready(M_AXI_RREADY),
 		//
 		// Formal outputs
@@ -1669,19 +1618,13 @@ module axisafety #(
 			assert(!write_timeout);
 
 		always @(*)
-			assume(fm_axi_wr_checkid == f_axi_wr_checkid);
-		always @(*)
-			assume(fm_axi_rd_checkid == f_axi_rd_checkid);
-
-		always @(*)
 		if (S_AXI_AWREADY)
 			assert(!M_AXI_AWVALID);
 
 		always @(*)
-		if (fm_axi_rd_outstanding > 0)
+		if ((fm_axi_rd_outstanding > 0)
+			&&(f_axi_rd_ckvalid)&&(fm_axi_rd_ckvalid))
 		begin
-			assume(f_axi_rd_ckvalid);
-			assume(fm_axi_rd_ckvalid);
 			assert(fm_axi_rd_nbursts == 1);
 			assert(fm_axi_rd_nbursts == f_axi_rd_nbursts);
 			assert(fm_axi_rdid_nbursts == f_axi_rdid_nbursts);
@@ -1689,13 +1632,47 @@ module axisafety #(
 			assert(f_axi_rd_outstanding
 				== fm_axi_rd_outstanding + (S_AXI_RVALID ? 1:0)
 					+ (r_rvalid ? 1 :0));
-		end else if (f_axi_rd_outstanding > 0)
-			assert(S_AXI_RVALID || M_AXI_ARVALID);
+		end
+
+		always @(*)
+		if (f_axi_rd_nbursts > 0)
+			assert(f_axi_rd_nbursts == fm_axi_rd_nbursts
+				+ (M_AXI_ARVALID ? 1 : 0)
+				+ (r_rvalid&&m_rlast ? 1 : 0)
+				+ (S_AXI_RVALID&&S_AXI_RLAST ? 1 : 0));
+
+		always @(*)
+		if (f_axi_rd_outstanding > 0)
+			assert(f_axi_rd_outstanding == fm_axi_rd_outstanding
+				+ (M_AXI_ARVALID ? M_AXI_ARLEN+1 : 0)
+				+ (r_rvalid ? 1 : 0)
+				+ (S_AXI_RVALID ? 1 : 0));
+
+		always @(*)
+		if (f_axi_rdid_outstanding > 0)
+		begin
+			if (M_AXI_ARVALID)
+				assert(rfifo_id == M_AXI_ARID);
+			if (rfifo_id == fm_axi_rd_checkid)
+			begin
+				assert(f_axi_rd_outstanding
+					== fm_axi_rdid_outstanding
+				+ ((M_AXI_ARVALID
+					&&M_AXI_ARID==fm_axi_rd_checkid)
+							? M_AXI_ARLEN+1 : 0)
+				+ (r_rvalid ? 1 : 0)
+				+ (S_AXI_RVALID ? 1 : 0));
+			end else begin
+				assert(fm_axi_rdid_outstanding == 0);
+				assert(!M_AXI_ARVALID
+					|| M_AXI_ARID != fm_axi_rd_checkid);
+			end
+		end
 
 		always @(*)
 		if (M_AXI_RVALID)
 			assert(!M_AXI_ARVALID);
-		
+
 
 		always @(*)
 			assert(m_wpending == fm_axi_wr_pending);
@@ -1705,23 +1682,21 @@ module axisafety #(
 		begin
 			assert(fm_axi_awr_nbursts== f_axi_awr_nbursts);
 			assert(fm_axi_awr_nbursts == 1);
-			assert(fm_axi_wrid_nbursts == f_axi_wrid_nbursts);
+			assert((fm_axi_wrid_nbursts == 1)
+				== (wfifo_id == fm_axi_wr_checkid));
 			if (fm_axi_wr_checkid == wfifo_id)
-			begin
-				assert(fm_axi_wrid_nbursts== f_axi_wrid_nbursts);
-			end else
+				assert(fm_axi_wrid_nbursts== f_axi_awr_nbursts);
+			else
 				assert(fm_axi_wrid_nbursts == 0);
 		end
 
 		always @(*)
-		if (fm_axi_wr_pending > 0)
-			assume(fm_axi_wr_ckvalid && f_axi_wr_ckvalid);
-
-		always @(*)
-		if (f_axi_wr_ckvalid && !M_AXI_AWVALID)
+		if (fm_axi_wr_pending>0)
 		begin
 			assert(f_axi_wr_size  == fm_axi_wr_size);
 			assert(f_axi_wr_burst == fm_axi_wr_burst);
+			assert(f_axi_wr_len   == fm_axi_wr_len);
+			assert(fm_axi_wr_ckvalid == (fm_axi_wr_checkid == wfifo_id));
 			assert(f_axi_wr_len   == fm_axi_wr_len);
 		end
 
@@ -1732,15 +1707,16 @@ module axisafety #(
 			r_waddr <= f_axi_wr_addr;
 
 		always @(*)
-		if (M_AXI_AWVALID && M_AXI_AWREADY)
-			m_waddr  = fm_axi_wr_addr;
+		if (S_AXI_AWVALID && S_AXI_AWREADY)
+			m_waddr  = f_axi_wr_addr;
 		else if (r_wvalid)
 			m_waddr  = r_waddr;
 		else
 			m_waddr  = f_axi_wr_addr;
 
 		always @(posedge S_AXI_ACLK)
-		if (M_AXI_WREADY || (M_AXI_AWVALID && M_AXI_AWREADY))
+		if (!M_AXI_WVALID||M_AXI_WREADY)
+		//		|| (M_AXI_AWVALID && M_AXI_AWREADY))
 			fm_waddr <= m_waddr;
 
 		always @(*)
@@ -1765,6 +1741,62 @@ module axisafety #(
 				== (M_AXI_AWVALID ? 1:0) + (S_AXI_BVALID ? 1:0)
 					+ fm_axi_awr_nbursts);
 	end endgenerate
+
+	////////////////////////////////////////////////////////////////
+	//
+	// Cover properties
+	//
+	// We'll use these to determine the best performance this core
+	// can achieve
+	//
+	////////////////////////////////////////////////////////////////
+
+	reg	[4:0]	f_dbl_rd_count, f_dbl_wr_count;
+
+	initial	f_dbl_wr_count = 0;
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN || o_write_fault)
+		f_dbl_wr_count = 0;
+	else if (S_AXI_AWVALID && S_AXI_AWREADY && S_AXI_AWLEN == 3)
+	begin
+		if (!(&f_dbl_wr_count))
+			f_dbl_wr_count <= f_dbl_wr_count + 1;
+	end
+
+	always @(*)
+		cover(!S_AXI_ARESETN && (f_dbl_wr_count > 3)
+			&& (!o_write_fault)
+			&&(!S_AXI_AWVALID && !S_AXI_WVALID
+					&& !S_AXI_BVALID)
+			&& (f_axi_awr_nbursts == 0)
+			&& (f_axi_wr_pending == 0));
+
+	always @(*)
+		cover(!S_AXI_ARESETN && (f_dbl_wr_count > 1)
+			&& (!o_write_fault)
+			);
+
+	always @(*)
+		cover(S_AXI_AWVALID && S_AXI_AWREADY);
+
+	always @(*)
+		cover(S_AXI_AWVALID && S_AXI_AWREADY && S_AXI_AWLEN == 3);
+
+	initial	f_dbl_rd_count = 0;
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN || o_read_fault)
+		f_dbl_rd_count = 0;
+	else if (S_AXI_ARVALID && S_AXI_ARREADY && S_AXI_ARLEN == 3)
+	begin
+		if (!(&f_dbl_rd_count))
+			f_dbl_rd_count <= f_dbl_rd_count + 1;
+	end
+
+	always @(*)
+		cover(!S_AXI_ARESETN && (f_dbl_rd_count > 3)
+			&& (f_axi_rd_nbursts == 0)
+			&& !S_AXI_ARVALID && !S_AXI_RVALID);
+
 `endif
 // User logic ends
 endmodule
