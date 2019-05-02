@@ -1,10 +1,10 @@
 [*]
 [*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
-[*] Mon Apr 22 16:22:58 2019
+[*] Mon Apr 29 18:28:28 2019
 [*]
-[dumpfile] "/home/dan/work/rnd/opencores/wb2axip/trunk/bench/formal/axixbar_prf4x8/engine_0/trace.vcd"
-[dumpfile_mtime] "Mon Apr 22 16:18:39 2019"
-[dumpfile_size] 264702
+[dumpfile] "/home/dan/work/rnd/opencores/wb2axip/trunk/bench/formal/axixbar_prf4x8/engine_0/trace_induct.vcd"
+[dumpfile_mtime] "Mon Apr 29 17:35:56 2019"
+[dumpfile_size] 985146
 [savefile] "/home/dan/work/rnd/opencores/wb2axip/trunk/bench/formal/axixbar_prf4x8.gtkw"
 [timestart] 0
 [size] 1918 1021
@@ -48,15 +48,17 @@ axixbar.M_AXI_AWQOS[15:0]
 -
 @22
 [color] 3
+axixbar.M_AXI_WVALID[3:0]
+@23
+[color] 2
+axixbar.M_AXI_WREADY[3:0]
+@22
+[color] 3
 axixbar.M_AXI_WDATA[127:0]
 [color] 3
 axixbar.M_AXI_WLAST[3:0]
 [color] 3
-axixbar.M_AXI_WREADY[3:0]
-[color] 3
 axixbar.M_AXI_WSTRB[15:0]
-[color] 3
-axixbar.M_AXI_WVALID[3:0]
 @200
 -
 @22
@@ -181,10 +183,8 @@ axixbar.S_AXI_BRESP[15:0]
 axixbar.S_AXI_ARVALID[7:0]
 [color] 3
 axixbar.S_AXI_ARREADY[7:0]
-@23
 [color] 2
 axixbar.S_AXI_ARID[15:0]
-@22
 [color] 2
 axixbar.S_AXI_ARADDR[255:0]
 [color] 6
