@@ -127,6 +127,7 @@ module faxi_slave #(
 	output	reg	[1:0]			f_axi_wr_burst,
 	output	reg	[2:0]			f_axi_wr_size,
 	output	reg	[7:0]			f_axi_wr_len,
+	output	reg				f_axi_wr_lockd,
 	//
 	// RD_COUNT: increment on read w/o last, cleared on read w/ last
 	output reg	[C_AXI_ID_WIDTH-1:0]	f_axi_rd_checkid,
@@ -138,6 +139,7 @@ module faxi_slave #(
 	output	reg	[1:0]			f_axi_rd_ckburst,
 	output	reg	[2:0]			f_axi_rd_cksize,
 	output	reg	[7:0]			f_axi_rd_ckarlen,
+	output	reg				f_axi_rd_cklockd,
 
 	output	reg	[F_LGDEPTH-1:0]		f_axi_rdid_nbursts,
 	output	reg	[F_LGDEPTH-1:0]		f_axi_rdid_outstanding,
@@ -193,7 +195,6 @@ module faxi_slave #(
 	wire	[AW-1:0]	next_wr_addr;
 	wire	[7:0]		this_wr_incr;
 	reg	[2:0]		this_awsize;
-	reg	[DW/8-1:0]	strb_mask;
 	reg			wr_aligned, awr_aligned,
 				rd_aligned, ard_aligned;
 	reg			rd_pending;
@@ -928,6 +929,7 @@ module faxi_slave #(
 			f_axi_wr_burst <= i_axi_awburst;
 			f_axi_wr_size  <= i_axi_awsize;
 			f_axi_wr_len   <= i_axi_awlen;
+			f_axi_wr_lockd <= i_axi_awlock;
 		end
 
 		if (!OPT_NARROW_BURST)
@@ -956,27 +958,8 @@ module faxi_slave #(
 	end
 
 	always @(*)
-	begin
-		awr_aligned = 1;
-		case(i_axi_awsize)
-		0: awr_aligned = 1;
-		1: awr_aligned = (i_axi_awaddr[  0] == 0);
-		2: awr_aligned = (i_axi_awaddr[((AW>1)? 1 : AW-1):0] == 0);
-		3: awr_aligned = (i_axi_awaddr[((AW>2)? 2 : AW-1):0] == 0);
-		4: awr_aligned = (i_axi_awaddr[((AW>3)? 3 : AW-1):0] == 0);
-		5: awr_aligned = (i_axi_awaddr[((AW>4)? 4 : AW-1):0] == 0);
-		6: awr_aligned = (i_axi_awaddr[((AW>5)? 5 : AW-1):0] == 0);
-		7: awr_aligned = (i_axi_awaddr[((AW>6)? 6 : AW-1):0] == 0);
-		endcase
-	end
-
-	always @(posedge i_clk)
-	if (i_axi_awvalid && i_axi_awburst == 2'b10)
-		`SLAVE_ASSUME(awr_aligned);
-
-	always @(*)
 		this_awsize = (f_axi_wr_pending>0) ? f_axi_wr_size : i_axi_awsize;
-		
+
 	faxi_addr #(.AW(AW)) get_next_waddr(
 		(f_axi_wr_pending>1) ? f_axi_wr_addr  : i_axi_awaddr,
 		this_awsize,
@@ -990,106 +973,47 @@ module faxi_slave #(
 	else if (axi_awr_req || axi_wr_req) // && first axi_wr_req
 		r_axi_wr_addr <= next_wr_addr;
 
-	always @(posedge i_clk)
-	if (i_axi_awvalid)
-		// A burst type of 2'b11 is reserved, and therefore illegal
-		`SLAVE_ASSUME(i_axi_awburst != 2'b11);
-
-	always @(*)
-	if (i_axi_awvalid)
-		`SLAVE_ASSUME(i_axi_awlen <= OPT_MAXBURST);
-
-	generate if (OPT_NARROW_BURST)
-	begin : WR_NARROW_ASSUME
-
-		always @(*)
-		if (i_axi_awvalid)
-			`SLAVE_ASSUME(DW >= (1<<(i_axi_awsize + 3)));
-
-	end else begin : WR_SZ_ASSUME
-
-		always @(*)
-		if (i_axi_awvalid)
-			`SLAVE_ASSUME(DW == (1<<(i_axi_awsize + 3)));
-
-	end endgenerate
-
-
-	//
-	// Wrapped bursts can only have lengths of 2, 4, 8, or 16 transfers
-	always @(posedge i_clk)
-	if (i_axi_awvalid && i_axi_awburst == 2'b10)
-	begin
-		`SLAVE_ASSUME((i_axi_awlen == 1)
-				||(i_axi_awlen == 3)
-				||(i_axi_awlen == 7)
-				||(i_axi_awlen == 15));
-	end
-
 	always @(*)
 	if (f_axi_wr_pending > 0)
 		f_axi_wr_addr = r_axi_wr_addr;
 	else
 		f_axi_wr_addr = i_axi_awaddr;
 
+
+	wire	valid_iwaddr;	// Incoming write address
+	wire	valid_pwaddr;	// Address of pending writes
+
+	// 
+	faxi_valaddr #(.C_AXI_DATA_WIDTH(DW), .C_AXI_ADDR_WIDTH(AW),
+			.OPT_MAXBURST(OPT_MAXBURST),
+			.OPT_EXCLUSIVE(OPT_EXCLUSIVE),
+			.OPT_NARROW_BURST(OPT_NARROW_BURST))
+		f_wraddr_validate(i_axi_awaddr, i_axi_awlen, i_axi_awsize,
+			i_axi_awburst, i_axi_awlock,
+			1'b1, awr_aligned, valid_iwaddr);
+
+	always @(*)
+	if (i_axi_awvalid)
+		`SLAVE_ASSUME(valid_iwaddr);
 	//
-	// The specification specifically prohibits any transaction from
-	// crossing a 4kB boundary
+
+	reg		wstb_valid;
+	reg	[6:0]	wstb_addr;
+	always @(*)
+		wstb_addr = f_axi_wr_addr;
+
+	faxi_wstrb #(.C_AXI_DATA_WIDTH(DW))
+		f_wstrbck (wstb_addr, this_awsize, i_axi_wstrb, wstb_valid);
+
+	// Insist the only the appropriate bits be valid
+	// For example, if the lower address bit is one, then the
+	// strobe LSB cannot be 1, but must be zero.  This is just
+	// enforcing the rules of the sub-address which must match
+	// the write strobe.  An STRB of 0 is always allowed.
 	//
-	generate if (AW >= 12)
-	begin : BOUNDARY_WRAP_WR_INITIAL
-		reg	[AW-1:0]	last_addr;
-		always @(*)
-			last_addr = i_axi_awaddr +(i_axi_awlen << i_axi_awsize);
-
-		always @(*)
-		if (i_axi_awvalid && i_axi_awburst == 2'b01)
-		begin
-			`SLAVE_ASSUME(i_axi_awaddr[AW-1:12] == last_addr[AW-1:12]);
-		end
-	end endgenerate
-
-	//
-	generate begin
-		// Insist the only the appropriate bits be valid
-		// For example, if the lower address bit is one, then the
-		// strobe LSB cannot be 1, but must be zero.  This is just
-		// enforcing the rules of the sub-address which must match
-		// the write strobe.  An STRB of 0 is always allowed.
-		//
-		always @(*)
-		begin
-			strb_mask = 1;
-			case(this_awsize)
-			1: strb_mask =   {(2){1'b1}};
-			2: strb_mask =   {(4){1'b1}};
-			3: strb_mask =   {(8){1'b1}};
-			4: strb_mask =  {(16){1'b1}};
-			5: strb_mask =  {(32){1'b1}};
-			6: strb_mask =  {(64){1'b1}};
-			7: strb_mask = {(128){1'b1}};
-			default: strb_mask = 1;
-			endcase
-
-			if (DW == 16)
-				strb_mask = strb_mask << f_axi_wr_addr[0];
-			if (DW == 32)
-				strb_mask = strb_mask << f_axi_wr_addr[1:0];
-			if (DW == 64)
-				strb_mask = strb_mask << f_axi_wr_addr[2:0];
-			if (DW == 128)
-				strb_mask = strb_mask << f_axi_wr_addr[3:0];
-			if (DW == 256)
-				strb_mask = strb_mask << f_axi_wr_addr[4:0];
-			if (DW == 512)
-				strb_mask = strb_mask << f_axi_wr_addr[5:0];
-			if (DW == 1024)
-				strb_mask = strb_mask << f_axi_wr_addr[6:0];
-
-			if (i_axi_wvalid && (f_axi_wr_pending > 0))
-				`SLAVE_ASSUME((i_axi_wstrb & ~strb_mask) == 0);
-		end
-	end endgenerate
+	always @(*)
+	if (i_axi_wvalid && (f_axi_wr_pending > 0))
+		`SLAVE_ASSUME(wstb_valid);
 
 	//
 	// Write induction properties
@@ -1099,74 +1023,34 @@ module faxi_slave #(
 	// logical registers, not so much the functionality of the core we are
 	// testing
 	//
+	reg	[7:0]	val_wr_len;
 	always @(*)
-	if (f_axi_wr_pending > 0)
-	begin
-		assert(f_axi_wr_burst != 2'b11);
-		if (f_axi_wr_burst == 2'b10)
-		begin
-			assert((f_axi_wr_len ==  1)
-				||(f_axi_wr_len ==  3)
-				||(f_axi_wr_len ==  7)
-				||(f_axi_wr_len == 15));
-		end
-	end
+		val_wr_len = f_axi_wr_pending[7:0]-1;
+
+	faxi_valaddr #(.C_AXI_DATA_WIDTH(DW), .C_AXI_ADDR_WIDTH(AW),
+			.OPT_MAXBURST(OPT_MAXBURST),
+			.OPT_EXCLUSIVE(OPT_EXCLUSIVE),
+			.OPT_NARROW_BURST(OPT_NARROW_BURST))
+		f_wraddr_valpending(f_axi_wr_addr, val_wr_len,
+			f_axi_wr_size, f_axi_wr_burst, f_axi_wr_lockd,
+			((f_axi_wr_pending < f_axi_wr_len+1)? 1'b0:1'b1),
+			wr_aligned, valid_pwaddr);
 
 	always @(*)
 	if (f_axi_wr_pending > 0)
-		assert(f_axi_wr_len <= OPT_MAXBURST);
+		assert(valid_pwaddr);
 
 	always @(*)
-	begin
-		wr_aligned = 1;
-		case(f_axi_wr_size)
-		0: wr_aligned = 1;
-		1: wr_aligned = (f_axi_wr_addr[  0] == 0);
-		2: wr_aligned = (f_axi_wr_addr[((AW>1)? 1 : AW-1):0] == 0);
-		3: wr_aligned = (f_axi_wr_addr[((AW>2)? 2 : AW-1):0] == 0);
-		4: wr_aligned = (f_axi_wr_addr[((AW>3)? 3 : AW-1):0] == 0);
-		5: wr_aligned = (f_axi_wr_addr[((AW>4)? 4 : AW-1):0] == 0);
-		6: wr_aligned = (f_axi_wr_addr[((AW>5)? 5 : AW-1):0] == 0);
-		7: wr_aligned = (f_axi_wr_addr[((AW>6)? 6 : AW-1):0] == 0);
-		endcase
-	end
-
-	always @(*)
-	if (f_axi_wr_pending > 0 && f_axi_wr_burst == 2'b10)
+	if ((f_axi_wr_pending > 0)&&(f_axi_wr_pending < f_axi_wr_len + 1)
+			&& f_axi_wr_burst != 2'b00)
 		assert(wr_aligned);
 
-	//
-	// The specification specifically prohibits any transaction from
-	// crossing a 4kB boundary
-	//
-	generate if (AW >= 12)
-	begin : BOUNDARY_WRAP_WR_INDUCTION
-		reg	[AW-1:0]	last_addr;
-		always @(*)
-			last_addr = f_axi_wr_addr + ((f_axi_wr_pending-1) << f_axi_wr_size);
-
-		always @(*)
-		if ((f_axi_wr_pending > 0)&&(f_axi_wr_burst == 2'b01))
-		begin
-			assert(f_axi_wr_addr[AW-1:12] == last_addr[AW-1:12]);
-		end
-	end endgenerate
-
-	generate if (OPT_NARROW_BURST)
-	begin : WR_NARROW_ASSERT
-
-		always @(*)
-		if (f_axi_wr_pending > 0)
-			assert(DW >= (1<<(f_axi_wr_size + 3)));
-
-	end else begin : WR_SZ_ASSERT
-
-		always @(*)
-		if (f_axi_wr_pending > 0)
-			assert(DW == (1<<(f_axi_wr_size + 3)));
-
-	end endgenerate
-
+	always @(*)
+	if ((f_axi_wr_pending > 0)&&(f_axi_wr_burst == 2'b10))
+		assert((f_axi_wr_len == 1)
+			||(f_axi_wr_len == 3)
+			||(f_axi_wr_len == 7)
+			||(f_axi_wr_len == 15));
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -1188,6 +1072,21 @@ module faxi_slave #(
 				&& (f_axi_rdid_ckign_nbursts == 0)
 				&& i_axi_rvalid);
 
+	reg	valid_iraddr, valid_praddr;
+
+	faxi_valaddr #(.C_AXI_DATA_WIDTH(DW), .C_AXI_ADDR_WIDTH(AW),
+			.OPT_MAXBURST(OPT_MAXBURST),
+			.OPT_EXCLUSIVE(OPT_EXCLUSIVE),
+			.OPT_NARROW_BURST(OPT_NARROW_BURST))
+		f_rdaddr_validate(i_axi_araddr, i_axi_arlen,
+			i_axi_arsize, i_axi_arburst, i_axi_arlock,
+			1'b1, ard_aligned, valid_iraddr);
+
+	always @(*)
+	if (i_axi_arvalid > 0)
+		`SLAVE_ASSUME(valid_iraddr);
+
+
 	always @(*)
 	if (!f_axi_rd_ckvalid || f_axi_rdid_ckign_nbursts != 0)
 		rd_pending = 0;
@@ -1201,10 +1100,6 @@ module faxi_slave #(
 		f_axi_rd_ckarlen,
 		f_axi_rd_ckincr, next_rd_addr);
 
-	always @(*)
-	if (i_axi_arvalid)
-		`SLAVE_ASSUME(i_axi_arlen <= OPT_MAXBURST);
-
 	always @(posedge i_clk)
 	begin
 		if (check_this_read_burst)
@@ -1213,9 +1108,10 @@ module faxi_slave #(
 			f_axi_rd_cksize  <= i_axi_arsize;
 			f_axi_rd_ckarlen <= i_axi_arlen;
 			f_axi_rd_ckaddr  <= i_axi_araddr;
+			f_axi_rd_cklockd <= i_axi_arlock;
 		end else if (check_this_return && axi_rd_ack)
 		begin
-			f_axi_rd_ckaddr <= next_rd_addr;
+			f_axi_rd_ckaddr  <= next_rd_addr;
 		end
 
 		if (!OPT_NARROW_BURST)
@@ -1243,89 +1139,6 @@ module faxi_slave #(
 		end
 	end
 
-	always @(posedge i_clk)
-	if (i_axi_arvalid)
-		// A burst type of 2'b11 is reserved, and therefore illegal
-		`SLAVE_ASSUME(i_axi_arburst != 2'b11);
-
-	always @(posedge i_clk)
-	if (i_axi_arvalid)
-	begin
-		if (DW <= 8)
-			`SLAVE_ASSUME(i_axi_arsize == 0);
-		else if (DW <= 16)
-			`SLAVE_ASSUME(i_axi_arsize <= 1);
-		else if (DW <= 32)
-			`SLAVE_ASSUME(i_axi_arsize <= 2);
-		else if (DW <= 64)
-			`SLAVE_ASSUME(i_axi_arsize <= 3);
-		else if (DW <= 128)
-			`SLAVE_ASSUME(i_axi_arsize <= 4);
-		else if (DW <= 256)
-			`SLAVE_ASSUME(i_axi_arsize <= 5);
-		else if (DW <= 512)
-			`SLAVE_ASSUME(i_axi_arsize <= 6);
-	end
-
-	//
-	// The specification specifically prohibits any transaction from
-	// crossing a 4kB boundary
-	//
-	generate if (AW >= 12)
-	begin : BOUNDARY_WRAP_RD_INITIAL
-		reg	[AW-1:0]	last_addr;
-		always @(*)
-			last_addr = i_axi_araddr +(i_axi_arlen << i_axi_arsize);
-
-		always @(*)
-		if (i_axi_arvalid && i_axi_arburst == 2'b01)
-		begin
-			`SLAVE_ASSUME(i_axi_araddr[AW-1:12] == last_addr[AW-1:12]);
-		end
-	end endgenerate
-
-	always @(*)
-	begin
-		ard_aligned = 1;
-		case(i_axi_arsize)
-		0: ard_aligned = 1;
-		1: ard_aligned = (i_axi_araddr[  0] == 0);
-		2: ard_aligned = (i_axi_araddr[((AW>1)? 1 : AW-1):0] == 0);
-		3: ard_aligned = (i_axi_araddr[((AW>2)? 2 : AW-1):0] == 0);
-		4: ard_aligned = (i_axi_araddr[((AW>3)? 3 : AW-1):0] == 0);
-		5: ard_aligned = (i_axi_araddr[((AW>4)? 4 : AW-1):0] == 0);
-		6: ard_aligned = (i_axi_araddr[((AW>5)? 5 : AW-1):0] == 0);
-		7: ard_aligned = (i_axi_araddr[((AW>6)? 6 : AW-1):0] == 0);
-		endcase
-	end
-
-	// Insist on initial alignment for any WRAP transactions
-	always @(*)
-	if (i_axi_arvalid && i_axi_arburst == 2'b10)
-		`SLAVE_ASSUME(ard_aligned);
-
-	// Wrapped bursts can only have lengths of 2, 4, 8, or 16 transfers
-	always @(posedge i_clk)
-	if (i_axi_arvalid && i_axi_arburst == 2'b10)
-	begin
-		`SLAVE_ASSUME((i_axi_arlen == 1)
-				||(i_axi_arlen == 3)
-				||(i_axi_arlen == 7)
-				||(i_axi_arlen == 15));
-	end
-
-	generate if (OPT_NARROW_BURST)
-	begin : RD_NARROW_ASSUME
-		always @(*)
-		if (i_axi_arvalid)
-			`SLAVE_ASSUME(DW >= (1<<(i_axi_arsize+3)));
-	end else begin : RD_SZ_ASSUME
-		always @(*)
-		if (i_axi_arvalid)
-			`SLAVE_ASSUME(DW == (1<<(i_axi_arsize+3)));
-	end endgenerate
-
-
 	//
 	// Read induction properties
 	//
@@ -1334,76 +1147,26 @@ module faxi_slave #(
 	// logical registers, not so much the functionality of the core we are
 	// testing
 	//
+	reg	[7:0]	val_rd_cklen;
+	always @(*)
+		val_rd_cklen= f_axi_rd_cklen[7:0]-1;
+	faxi_valaddr #(.C_AXI_DATA_WIDTH(DW), .C_AXI_ADDR_WIDTH(AW),
+			.OPT_MAXBURST(OPT_MAXBURST),
+			.OPT_EXCLUSIVE(OPT_EXCLUSIVE),
+			.OPT_NARROW_BURST(OPT_NARROW_BURST))
+		f_rdaddr_valpending(f_axi_rd_ckaddr, val_rd_cklen,
+			f_axi_rd_cksize, f_axi_rd_ckburst, f_axi_rd_cklockd,
+			(f_axi_rd_cklen != f_axi_rd_ckarlen+1) ? 1'b0 : 1'b1,
+			rd_aligned, valid_praddr);
+
+
 	always @(*)
 	if (f_axi_rd_ckvalid)
-	begin
-		assert(f_axi_rd_ckburst != 2'b11);
-		if (f_axi_rd_ckburst == 2'b10)
-		begin
-			assert((f_axi_rd_ckarlen ==  1)
-				||(f_axi_rd_ckarlen ==  3)
-				||(f_axi_rd_ckarlen ==  7)
-				||(f_axi_rd_ckarlen == 15));
-		end
-	end
-
-	always @(*)
-	if ((f_axi_rd_ckvalid > 0) && (OPT_MAXBURST < 8'hff))
-		assert(f_axi_rd_cklen <= OPT_MAXBURST+1);
-
-	//
-	// The specification specifically prohibits any transaction from
-	// crossing a 4kB boundary
-	//
-	generate if (AW >= 12)
-	begin : BOUNDARY_WRAP_RD_INDUCTION
-		reg	[AW-1:0]	last_addr;
-		always @(*)
-			last_addr = f_axi_rd_ckaddr + ((f_axi_rd_cklen-1) << f_axi_rd_cksize);
-
-		always @(*)
-		if (f_axi_rd_ckvalid && f_axi_rd_ckburst == 2'b01
-				&& (f_axi_rd_cklen > 2))
-			assert(f_axi_rd_ckaddr[AW-1:12] == last_addr[AW-1:12]);
-
-	end endgenerate
-
-	generate if (OPT_NARROW_BURST)
-	begin : RD_NARROW_ASSERT
-
-		always @(*)
-		if (f_axi_rd_ckvalid > 0)
-			assert(DW >= (1<<(f_axi_rd_cksize + 3)));
-	end else begin : RD_SZ_ASSERT
-		always @(*)
-		if (f_axi_rd_ckvalid > 0)
-			assert(DW == (1<<(f_axi_rd_cksize + 3)));
-	end endgenerate
-
+		assert(valid_praddr);
 
 	always @(*)
 	if (f_axi_rd_ckvalid)
 		assert(f_axi_rd_cklen <= f_axi_rd_ckarlen+1);
-
-	always @(*)
-	begin
-		rd_aligned = 1;
-		case(f_axi_rd_cksize)
-		0: rd_aligned = 1;
-		1: rd_aligned = (f_axi_rd_ckaddr[  0] == 0);
-		2: rd_aligned = (f_axi_rd_ckaddr[((AW>1)? 1 : AW-1):0] == 0);
-		3: rd_aligned = (f_axi_rd_ckaddr[((AW>2)? 2 : AW-1):0] == 0);
-		4: rd_aligned = (f_axi_rd_ckaddr[((AW>3)? 3 : AW-1):0] == 0);
-		5: rd_aligned = (f_axi_rd_ckaddr[((AW>4)? 4 : AW-1):0] == 0);
-		6: rd_aligned = (f_axi_rd_ckaddr[((AW>5)? 5 : AW-1):0] == 0);
-		7: rd_aligned = (f_axi_rd_ckaddr[((AW>6)? 6 : AW-1):0] == 0);
-		endcase
-	end
-
-	always @(*)
-	if (f_axi_rd_ckvalid && f_axi_rd_cklen <= f_axi_rd_ckarlen
-			&& f_axi_rd_ckburst != 2'b00)
-		assert(rd_aligned);
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -1444,8 +1207,6 @@ module faxi_slave #(
 		always @(*)
 		if (i_axi_awvalid && i_axi_awlock)
 		begin
-			`SLAVE_ASSUME(i_axi_awlen < 16);
-			`SLAVE_ASSUME(awr_aligned);
 			`SLAVE_ASSUME(!i_axi_awcache[0]);
 			if (f_axi_wr_checkid == f_axi_rd_checkid)
 				`SLAVE_ASSUME(f_axi_rdid_nbursts == 0);
@@ -1455,8 +1216,6 @@ module faxi_slave #(
 		always @(*)
 		if (i_axi_arvalid && i_axi_arlock)
 		begin
-			`SLAVE_ASSUME(i_axi_arlen < 16);
-			`SLAVE_ASSUME(ard_aligned);
 			`SLAVE_ASSUME(!i_axi_arcache[0]);
 		end
 

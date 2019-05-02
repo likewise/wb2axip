@@ -20,6 +20,8 @@ read -formal axisafety.v
 read -formal faxi_slave.v
 read -formal faxi_master.v
 read -formal faxi_addr.v
+read -formal faxi_valaddr.v
+read -formal faxi_wstrb.v
 ~fault: chparam -set F_OPT_FAULTLESS 1 axisafety
 fault:  chparam -set F_OPT_FAULTLESS 0 axisafety
 prep -top axisafety
@@ -29,3 +31,5 @@ prep -top axisafety
 faxi_slave.v
 faxi_master.v
 faxi_addr.v
+faxi_valaddr.v
+faxi_wstrb.v

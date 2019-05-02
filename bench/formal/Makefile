@@ -77,7 +77,7 @@ AXISAFETY  := axisafety
 AXIL       := faxil_master.v faxil_slave.v
 WB         := fwb_master.v   fwb_slave.v
 WBC        := fwbc_master.v  fwbc_slave.v
-AXI        := faxi_master.v  faxi_slave.v  faxi_addr.v
+AXI        := faxi_master.v  faxi_slave.v  faxi_addr.v faxi_valaddr.v faxi_wstrb.v
 AXIS       := faxis_master.v faxis_slave.v
 
 .PHONY: $(WBARB) $(WB2AXI) $(RDLITE) $(WRLITE) $(AXLITE) $(WB2LITE) $(DEMOAXI)

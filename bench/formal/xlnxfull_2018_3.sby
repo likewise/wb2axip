@@ -18,9 +18,13 @@ smtbmc boolector
 read -formal xlnxfull_2018_3.v
 read -formal faxi_slave.v
 read -formal faxi_addr.v
+read -formal faxi_valaddr.v
+read -formal faxi_wstrb.v
 prep -top xlnxfull_2018_3
 
 [files]
 xlnxfull_2018_3.v
 faxi_slave.v
 faxi_addr.v
+faxi_valaddr.v
+faxi_wstrb.v

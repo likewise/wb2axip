@@ -1405,6 +1405,28 @@ module axisafety #(
 	always @(*)
 		assert(m_wlastctr == (m_wpending == 1));
 
+	//
+	// Verify the contents of the skid buffers
+	//
+	wire	skid_awvalid, awr_aligned;
+	// First the write address skid buffer
+	faxi_valaddr #(.C_AXI_DATA_WIDTH(DW), .C_AXI_ADDR_WIDTH(AW),
+			.OPT_EXCLUSIVE((F_OPT_FAULTLESS) ? 0:1))
+		f_wraddr_skid(r_awaddr, r_awlen,
+			r_awsize, r_awburst, r_awlock,
+			1'b1, awr_aligned, skid_awvalid);
+
+	always @(*)
+	if (r_awvalid)
+		assert(skid_awvalid);
+
+	// Then the write data skid buffer
+	//   Should be pressed through via burst length
+
+	always @(*)
+	if (write_timer > OPT_TIMEOUT)
+		assert(write_timeout);
+
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Read induction properties
@@ -1455,6 +1477,27 @@ module axisafety #(
 		assert(rfifo_last        == (rfifo_counter == 1));
 		assert(rfifo_penultimate == (rfifo_counter == 2));
 	end
+
+	//
+	// Verify the contents of the skid buffers
+	//
+	wire	skid_arvalid, ard_aligned;
+
+	// First the write address skid buffer
+	faxi_valaddr #(.C_AXI_DATA_WIDTH(DW), .C_AXI_ADDR_WIDTH(AW),
+			.OPT_EXCLUSIVE((F_OPT_FAULTLESS) ? 0:1))
+		f_rdaddr_rskid(r_araddr, r_arlen,
+			r_arsize, r_arburst, r_arlock,
+			1'b1, ard_aligned, skid_arvalid);
+
+	always @(*)
+	if (r_arvalid)
+		assert(skid_arvalid);
+
+	always @(*)
+	if (read_timer > OPT_TIMEOUT)
+		assert(read_timeout);
+
 
 	////////////////////////////////////////////////////////////////////////
 	//

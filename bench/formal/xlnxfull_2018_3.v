@@ -895,15 +895,17 @@ module xlnxfull_2018_3 #(
 		assert(axi_awv_awr_flag);
 	else if (!S_AXI_AWREADY)
 		assert(!axi_awv_awr_flag);
+
 	always @(*)
 	if (f_axi_awr_nbursts > 0)
 		assert(axi_awv_awr_flag || S_AXI_BVALID);
+
 	always @(*)
 	if ((f_axi_wr_ckvalid)&&(f_axi_wr_pending > 0))
 	begin
-		assert(axi_awaddr == f_axi_wr_addr);
+		assert(axi_awaddr  == f_axi_wr_addr);
 		assert(axi_awburst == f_axi_wr_burst);
-		assert(axi_awlen == f_axi_wr_len);
+		assert(axi_awlen   == f_axi_wr_len);
 	end
 
 	always @(*)
