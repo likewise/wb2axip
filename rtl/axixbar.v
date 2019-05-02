@@ -347,6 +347,9 @@ module	axixbar #(
 
 	reg	[NSFULL-1:0]	s_axi_awvalid;
 	reg	[NSFULL-1:0]	s_axi_awready;
+	reg	[IW-1:0]	s_axi_awid	[0:NSFULL-1];
+	reg	[7:0]		s_axi_awlen	[0:NSFULL-1];
+
 	reg	[NSFULL-1:0]	s_axi_wvalid;
 	reg	[NSFULL-1:0]	s_axi_wready;
 	reg	[NSFULL-1:0]	s_axi_bvalid;
@@ -392,6 +395,9 @@ module	axixbar #(
 
 		for(iM=0; iM<NS; iM=iM+1)
 		begin
+			s_axi_awid[iM]  = S_AXI_AWID[ iM*IW +: IW];
+			s_axi_awlen[iM] = S_AXI_AWLEN[iM* 8 +:  8];
+
 			s_axi_bid[iM]   = S_AXI_BID[iM* IW +:  IW];
 			s_axi_bresp[iM] = S_AXI_BRESP[iM* 2 +:  2];
 
@@ -402,6 +408,9 @@ module	axixbar #(
 		end
 		for(iM=NS; iM<NSFULL; iM=iM+1)
 		begin
+			s_axi_awid[iM]  = 0;
+			s_axi_awlen[iM] = 0;
+
 			s_axi_bresp[iM] = INTERCONNECT_ERROR;
 			s_axi_bid[iM]   = 0;
 
@@ -2222,7 +2231,7 @@ module	axixbar #(
 	end endgenerate
 
 	reg	[F_LGDEPTH-1:0]	unwr_bursts		[0:NM-1];
-	reg	[F_LGDEPTH-1:0]	unwr_pending		[0:NM-1];
+	reg	[F_LGDEPTH-1:0]	unwr_data		[0:NM-1];
 	reg	[F_LGDEPTH-1:0]	unwrid_bursts		[0:NM-1];
 
 	reg	[F_LGDEPTH-1:0]	unrd_bursts		[0:NM-1];
@@ -2248,7 +2257,7 @@ module	axixbar #(
 			.C_AXI_ADDR_WIDTH(AW),
 			.F_OPT_ASSUME_RESET(1'b1),
 			.F_AXI_MAXSTALL(0),
-			.F_AXI_MAXRSTALL(2),
+			.F_AXI_MAXRSTALL(1),
 			.F_AXI_MAXDELAY(0),
 			.F_OPT_READCHECK(0),
 			.F_OPT_NO_RESET(1),
@@ -2307,11 +2316,11 @@ module	axixbar #(
 			.f_axi_wr_checkid(fm_wr_checkid[N]),
 			.f_axi_wr_ckvalid(fm_wr_ckvalid[N]),
 			.f_axi_wrid_nbursts(fm_wrid_nbursts[N]),
-			.f_axi_wr_addr(fm_wr_addr[N]),
-			.f_axi_wr_incr(fm_wr_incr[N]),
+			.f_axi_wr_addr( fm_wr_addr[N]),
+			.f_axi_wr_incr( fm_wr_incr[N]),
 			.f_axi_wr_burst(fm_wr_burst[N]),
-			.f_axi_wr_size(fm_wr_size[N]),
-			.f_axi_wr_len(fm_wr_len[N]),
+			.f_axi_wr_size( fm_wr_size[N]),
+			.f_axi_wr_len(  fm_wr_len[N]),
 			//
 			.f_axi_rd_checkid(fm_rd_checkid[N]),
 			.f_axi_rd_ckvalid(fm_rd_ckvalid[N]),
@@ -2341,23 +2350,28 @@ module	axixbar #(
 
 		always @(*)
 		begin
-			unwr_pending[N] = 0;
-			if (r_wvalid[N])
-				unwr_pending[N] = unwr_pending[N] + 1;
+			unwr_data[N] = 0;
 			if (mwgrant[N] && (mwindex[N]<NS) && s_axi_wvalid[mwindex[N]])
-				unwr_pending[N] = unwr_pending[N] + 1;
+				unwr_data[N] = unwr_data[N] + 1;
+			if (!mwgrant[N] || (mwindex[N]==NS)
+				|| !s_axi_wvalid[mwindex[N]] || !S_AXI_WLAST[N])
+			begin
+				if (r_wvalid[N])
+					unwr_data[N] = unwr_data[N] + 1;
+			end
 		end
 
 		always @(*)
 		begin
 			unwrid_bursts[N] = 0;
-			if (r_awvalid[N])
+			if (r_awvalid[N] && r_awid[N] == fm_wr_checkid[N])
 				unwrid_bursts[N] = unwrid_bursts[N] + 1;
-			if (mwgrant[N] && (mwindex[N]<NS) && s_axi_awvalid[mwindex[N]])
+			if (mwgrant[N] && (mwindex[N]<NS) && s_axi_awvalid[mwindex[N]]
+					&& s_axi_awid[mwindex[N]] == fm_wr_checkid[N])
 				unwrid_bursts[N] = unwrid_bursts[N] + 1;
-			if (r_bvalid[N])
+			if (r_bvalid[N] && r_bid[N] == fm_wr_checkid[N])
 				unwrid_bursts[N] = unwrid_bursts[N] + 1;
-			if (M_AXI_BVALID[N])
+			if (M_AXI_BVALID[N] && M_AXI_BID[N*IW +: IW] == fm_wr_checkid[N])
 				unwrid_bursts[N] = unwrid_bursts[N] + 1;
 		end
 
@@ -2376,19 +2390,10 @@ module	axixbar #(
 				== { 1'b0, w_mwpending[N] });
 
 		always @(*)
-		if (S_AXI_ARESETN && mwgrant[N] && mwindex[N] < NS)
-			assert(fm_awr_nbursts[N]==
-				fs_awr_nbursts[mwindex[N]]
-				+ (r_awvalid[N] ? 1:0)
-				+ (S_AXI_AWVALID[mwindex[N]] ? 1:0)
-				+ (r_bvalid[N] ? 1:0)
-				+ (M_AXI_BVALID[N] ? 1:0));
-
-		always @(*)
 		if (S_AXI_ARESETN && wgrant[N][NS])
 			assert(fm_awr_nbursts[N]==
 				+ ((fm_wr_pending[N]>0) ? 1:0)
-				+ ((r_wvalid[N]&&r_wlast[N]) ? 1:0)
+				+ ((fm_wr_pending[N]==0)&&(r_wvalid[N]&&r_wlast[N]) ? 1:0)
 				+ (M_AXI_BVALID[N] ? 1:0));
 
 /*
@@ -2402,7 +2407,17 @@ module	axixbar #(
 			assert(w_mwpending[N] == 0);
 		end
 */
+		always @(posedge S_AXI_ACLK)
+		if (S_AXI_ARESETN)
+		begin
+			if ((fm_wr_pending[N] > 0)&&(!$past(M_AXI_WVALID[N]))
+				&&(!$past(M_AXI_WVALID[N],2)))
+				assume(M_AXI_WVALID[N]);
+		end
 
+		////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////
+		////////////////////////////////////////////////////////////////
 
 		//
 		// Check read counters
@@ -2655,9 +2670,9 @@ module	axixbar #(
 			.C_AXI_DATA_WIDTH(DW),
 			.C_AXI_ADDR_WIDTH(AW),
 			.F_OPT_ASSUME_RESET(1'b1),
-			.F_AXI_MAXSTALL(2),
+			.F_AXI_MAXSTALL(1),
 			.F_AXI_MAXRSTALL(0),
-			.F_AXI_MAXDELAY(3),
+			.F_AXI_MAXDELAY(2),
 			.F_OPT_READCHECK(0),
 			.F_OPT_NO_RESET(1),
 			.F_LGDEPTH(F_LGDEPTH))
@@ -2775,13 +2790,196 @@ module	axixbar #(
 
 	generate for(N=0; N<NM; N=N+1)
 	begin : CORRELATE_OUTSTANDING
-/*
+		wire	[AW-1:0]	next_waddr, dbl_next_waddr;
+		reg	[LGNS-1:0]	valwslv;
+		wire	[7:0]		fs_wr_inc, fs_wr_dblinc;
+
+		always @(*)
+		begin
+			valwslv = 0;
+			if (mwgrant[N] && mwindex[N] < NS)
+				valwslv = mwindex[N];
+		end
+
+		faxi_addr #(AW) get_next_waddr (fs_wr_addr[valwslv],
+				fs_wr_size[valwslv],
+				fs_wr_burst[valwslv],
+				fs_wr_len[ valwslv],
+				fs_wr_inc,
+				next_waddr);
+
+		faxi_addr #(AW) get_dblnext_waddr (next_waddr,
+				fs_wr_size[valwslv],
+				fs_wr_burst[valwslv],
+				fs_wr_len[ valwslv],
+				fs_wr_dblinc,
+				dbl_next_waddr);
+
 		always @(*)
 		if (mwgrant[N] && (mwindex[N] < NS))
 		begin
 			assert(fm_awr_nbursts[N] == fs_awr_nbursts[mwindex[N]]
 					+ unwr_bursts[N]);
 
+			assert(fm_wrid_nbursts[N] == fs_wrid_nbursts[mwindex[N]]
+					+ unwrid_bursts[N]);
+
+			assert(((fm_awr_nbursts[N]
+				- (r_awvalid[N] ? 1:0)
+				- (s_axi_awvalid[N] ? 1:0)
+				- (r_bvalid[N] ? 1:0)
+				- (M_AXI_BVALID[N] ? 1:0)
+				- (fs_wr_pending[N] > 0)) > 0)
+				||(!s_axi_bvalid[N]));
+
+			assert(((fm_wrid_nbursts[N]
+				-((r_awvalid[N]&&r_awid[N]==fm_wr_checkid[N]) ? 1:0)
+				-((s_axi_awvalid[mwindex[N]]&&s_axi_awid[mwindex[N]]==fm_wr_checkid[N]) ? 1:0)
+				-((r_bvalid[N]&&r_bid[N]==fm_wr_checkid[N])?1:0)
+				- (M_AXI_BVALID[N]&&M_AXI_BID[N]==fm_wr_checkid[N] ? 1:0)
+				- (fs_wr_ckvalid[mwindex[N]] ? 1:0)) > 0)
+				||(!s_axi_bvalid[mwindex[N]]||s_axi_bid[mwindex[N]]==fm_wr_checkid[N]));
+
+/*
+			assert(((fm_awr_nbursts[N]-fm_wrid_nbursts[N]
+				-((r_awvalid[N]&&r_awid[N]!=fm_wr_checkid[N]) ? 1:0)
+				-((s_axi_awvalid[mwindex[N]]&&s_axi_awid[mwindex[N]]!=fm_wr_checkid[N]) ? 1:0)
+				-((r_bvalid[N]&&r_bid[N]!=fm_wr_checkid[N])?1:0)
+				- (M_AXI_BVALID[N]&&M_AXI_BID[N]!=fm_wr_checkid[N] ? 1:0)
+				-((!fs_wr_ckvalid[mwindex[N]]&&fs_wr_pending[mwindex[mwindex[N]]]>0) ? 1:0)) > 0)
+				||(!s_axi_bvalid[mwindex[N]]||s_axi_bid[mwindex[N]]!=fm_wr_checkid[mwindex[N]]));
+*/
+
+`ifdef	THIS_DIDNT_WORK
+			///
+			/*
+			if (s_axi_bvalid[N])
+				assert(fm_awr_nbursts[N] - awr_returning >
+					fs_awr_nbursts[N]
+					+ (r_awvalid[N] ? 1:0)
+					+ (s_axi_awvalid[N] ? 1:0));
+			else
+			*/
+				assert(fm_awr_nbursts[N] - awr_returning >=
+					fs_awr_nbursts[N]
+					+ (r_awvalid[N] ? 1:0)
+					+ (s_axi_awvalid[N] ? 1:0));
+			///
+			/*
+			if (s_axi_bvalid[N] && s_axi_bid[N] == fs_wr_checkid[N])
+				assert(fm_wrid_nbursts[N] - wrid_returning >=
+				fs_wrid_nbursts[mwindex[N]]
+				+ ((r_awvalid[N] && r_awid[N]==fm_wr_checkid[N]) ? 1:0)
+				+ ((s_axi_awvalid[N] && s_axi_awid[N]==fm_wr_checkid[N]) ? 1:0));
+
+			else
+			*/
+				assert(fm_wrid_nbursts[N] - wrid_returning >=
+				fs_wrid_nbursts[mwindex[N]]
+				+ ((r_awvalid[N] && r_awid[N]==fm_wr_checkid[N]) ? 1:0)
+				+ ((s_axi_awvalid[N] && s_axi_awid[N]==fm_wr_checkid[N]) ? 1:0));
+
+			///
+			/*
+			if (s_axi_bvalid[N] && s_axi_bid[N] != fs_wr_checkid[N])
+				assert((fm_awr_nbursts[N]-fm_wrid_nbursts[N])
+					- (awr_returning-wrid_returning) >
+				(fs_awr_nbursts[mwindex[N]]-fs_wrid_nbursts[mwindex[N]])
+				+ ((r_awvalid[N] && r_awid[N]!=fm_wr_checkid[N]) ? 1:0)
+				+ ((s_axi_awvalid[N] && s_axi_awid[N]!=fm_wr_checkid[N]) ? 1:0));
+
+			else
+			*/
+				assert((fm_awr_nbursts[N]-fm_wrid_nbursts[N])
+					- (awr_returning-wrid_returning) >=
+				(fs_awr_nbursts[N]-fs_wrid_nbursts[N])
+				+ ((r_awvalid[N] && r_awid[N]!=fm_wr_checkid[N]) ? 1:0)
+				+ ((s_axi_awvalid[N] && s_axi_awid[N]!=fm_wr_checkid[N]) ? 1:0));
+`endif
+			////
+			////
+
+
+			if (r_awvalid[N] && s_axi_awvalid[mwindex[N]])
+			begin
+				assert((s_axi_wvalid[N] && S_AXI_WLAST[N])
+					|| (r_wvalid[N] && r_wlast[N]));
+			end
+
+			if (r_awvalid[N])
+				assert((fm_wr_pending[N] == r_awlen[N]+1)
+					||((fm_wr_pending[N] == r_awlen[N])
+						&& r_wvalid[N]));
+			else if (s_axi_awvalid[mwindex[N]])
+			begin
+				if (fs_wr_pending[N] > 0)
+					assert(fs_wr_pending[N] ==unwr_data[N]);
+				else
+				   assert((fm_wr_pending[N] == s_axi_awlen[N]+1)
+					||(fm_wr_pending[N] == s_axi_awlen[N]
+					    &&(r_wvalid[N] || s_axi_wvalid[N]))
+					||(fm_wr_pending[N] == 0)
+					||(fm_wr_pending[N]==s_axi_awlen[N]-1));
+			end else begin
+				assert(fm_wr_pending[N] + unwr_data[N]
+					== fs_wr_pending[mwindex[N]]);
+
+				// .f_axi_wr_addr(fs_wr_addr[M]),
+				if (!r_wvalid[N] && !S_AXI_WVALID[mwindex[N]])
+					if (fm_wr_pending[N]>0)
+					assert(fm_wr_addr[N]==fs_wr_addr[mwindex[N]]);
+				else if (S_AXI_WVALID[N] && !r_wvalid[N])
+				begin
+					if (fm_wr_pending[N]>1)
+					assert(fm_wr_addr[N]==next_waddr);
+				end else if (S_AXI_WVALID[N] && r_wvalid[N])
+				begin
+					if (fm_wr_pending[N]>1)
+					assert(fm_wr_addr[N]==dbl_next_waddr);
+				end
+				//
+				//
+				if (fm_wr_pending[N]>1)
+				begin
+				assert(fm_wr_incr[N] ==fs_wr_incr[ mwindex[N]]);
+				assert(fm_wr_burst[N]==fs_wr_burst[mwindex[N]]);
+				assert(fm_wr_size[N] ==fs_wr_size[ mwindex[N]]);
+				assert(fm_wr_len[N]  ==fs_wr_len[  mwindex[N]]);
+				end
+
+				if (fm_wr_ckvalid[N])
+					assert(fs_wr_ckvalid[N]);
+				else if (fm_wr_pending[N] > 0)
+					assert(!fs_wr_ckvalid[N]);
+			end
+
+			if ((r_awvalid[N] || s_axi_awvalid[mwindex[N]])
+				&& fm_wr_ckvalid[N])
+			begin
+				assert((s_axi_awvalid[mwindex[N]]
+					    && s_axi_awid[N] == fm_wr_checkid[N])
+					||(r_awvalid[N]
+					    && r_awid[N] == fm_wr_checkid[N]));
+			end
+
+			if (!s_axi_awvalid[mwindex[N]]
+				&& (r_awvalid[mwindex[N]]
+					&& !wrequest[N][mwindex[N]]))
+			begin
+				assert((fm_wr_pending[N]== r_awlen[N]
+						&&(r_wvalid[N]))
+					||(fm_wr_pending[N]== r_awlen[N]+1));
+			end
+
+			if (r_wvalid[N] && s_axi_wvalid[mwindex[N]]
+						&& !S_AXI_WLAST[N])
+			begin
+				if (s_axi_awvalid[mwindex[N]])
+					assert(fs_wr_pending[N] == 0);
+				else
+					assert(fs_wr_pending[N] >= 1+(r_wlast[N]? 1:0));
+			end
+/*
 			if (S_AXI_AWVALID[mwindex[N]] || s_axi_awvalid[mwindex[N]])
 			begin
 				assert(fs_wr_pending[N] == 0);
@@ -2801,8 +2999,8 @@ module	axixbar #(
 						(r_awvalid[N] ? 1:0)
 						+(M_AXI_BVALID[N]  ? 1:0));
 			end
-		end
 */
+		end
 
 		always @(*)
 			assert(M_AXI_AWREADY[N] == ((fm_wr_pending[N] == 0)
@@ -2813,12 +3011,38 @@ module	axixbar #(
 				&& (fm_wr_pending[N] > 0)));
 
 		always @(*)
+		if (mwgrant[N] && (mwindex[N]==NS))
+		begin
+			assert(fm_awr_nbursts[N] <= 1);
+			if (!r_awvalid[N] && (fm_awr_nbursts[N] > 0))
+			begin
+				if (fm_wrid_nbursts[N] > 0)
+					assert(fm_wr_checkid[N]==M_AXI_BID[IW*N+: IW]);
+				else
+					assert(fm_wr_checkid[N]!=M_AXI_BID[IW*N+: IW]);
+			end else if (r_awvalid[N])
+			begin
+				if (fm_wrid_nbursts[N] > 0)
+					assert(r_awid[N] == fm_wr_checkid[N]);
+				else
+					assert(r_awid[N] != fm_wr_checkid[N]);
+			end
+		end
+
+		always @(*)
 		if (mwgrant[N] && !wgrant[N][NS])
 			assume(fm_wr_checkid[N] == fs_wr_checkid[mwindex[N]]);
 
+		always @(*)
+		if (!mwgrant[N])
+		begin
+			assert(fm_awr_nbursts[N] == (r_awvalid[N] ? 1:0));
+			assert(fm_wrid_nbursts[N] == ((r_awvalid[N]&&(r_awid[N] == fm_wr_checkid[N])) ? 1:0));
+		end
 
+		////////////////////////////////////////////////////////////////
 		//
-		//
+		// Read counter correlators
 		//
 
 		always @(*)
