@@ -140,7 +140,7 @@ module	wbp2classic(i_clk, i_reset,
 		assume(i_reset);
 
 	fwb_slave #(.AW(AW), .DW(DW),
-			.F_MAX_STALL(4),
+			.F_MAX_STALL(6),
 			.F_MAX_ACK_DELAY(2),
 			.F_LGDEPTH(1)) incoming (i_clk, i_reset,
 		i_mcyc, i_mstb, i_mwe, i_maddr, i_mdata, i_msel,
