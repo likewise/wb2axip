@@ -30,6 +30,8 @@ read -formal axixbar.v
 read -formal faxi_slave.v
 read -formal faxi_master.v
 read -formal faxi_addr.v
+read -formal faxi_valaddr.v
+read -formal faxi_wstrb.v
 nxm: chparam -set NM 4 -set NS 8 axixbar
 # oxm: chparam -set NM 1 -set NS 8 axixbar
 # oxl: chparam -set NM 1 -set NS 3 axixbar
@@ -45,3 +47,5 @@ dump
 faxi_slave.v
 faxi_master.v
 faxi_addr.v
+faxi_valaddr.v
+faxi_wstrb.v

@@ -90,26 +90,25 @@ $(WBARB)_cvr/PASS: $(RTL)/$(WBARB).v $(WBARB).sby $(WB)
 
 .PHONY: $(WB2AXI)
 $(WB2AXI): $(WB2AXI)/PASS
-$(WB2AXI)/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB)
+$(WB2AXI)/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
 	sby -f $(WB2AXI).sby
 
 $(RDLITE): $(RDLITE)_prf/PASS $(RDLITE)_cvr/PASS
-$(RDLITE)_prf/PASS: $(RDLITE).sby $(RTL)/$(RDLITE).v $(WB)
+$(RDLITE)_prf/PASS: $(RDLITE).sby $(RTL)/$(RDLITE).v $(WB) $(AXIL)
 	sby -f $(RDLITE).sby prf
-$(RDLITE)_cvr/PASS: $(RDLITE).sby $(RTL)/$(RDLITE).v $(WB)
+$(RDLITE)_cvr/PASS: $(RDLITE).sby $(RTL)/$(RDLITE).v $(WB) $(AXIL)
 	sby -f $(RDLITE).sby cvr
 
 $(WRLITE): $(WRLITE)_prf/PASS $(WRLITE)_cvr/PASS
-$(WRLITE)_prf/PASS: $(WRLITE).sby $(RTL)/$(WRLITE).v $(WB)
+$(WRLITE)_prf/PASS: $(WRLITE).sby $(RTL)/$(WRLITE).v $(WB) $(AXIL)
 	sby -f $(WRLITE).sby prf
-$(WRLITE)_cvr/PASS: $(WRLITE).sby $(RTL)/$(WRLITE).v $(WB)
+$(WRLITE)_cvr/PASS: $(WRLITE).sby $(RTL)/$(WRLITE).v $(WB) $(AXIL)
 	sby -f $(WRLITE).sby cvr
 
 .PHONY: $(AXLITE)
 $(AXLITE): $(AXLITE)_prf/PASS $(AXLITE)_cvr/PASS
-AXLITE_DEPS := $(RTL)/$(RDLITE).v $(RTL)/$(WRLITE).v			\
-	$(RTL)/$(WBARB).v fwb_master.v faxil_slave.v			\
-	$(AXLITE).sby $(RTL)/$(AXLITE).v				\
+AXLITE_DEPS := $(RTL)/$(RDLITE).v $(RTL)/$(WRLITE).v $(AXIL) $(WB)	\
+	$(RTL)/$(WBARB).v $(AXLITE).sby $(RTL)/$(AXLITE).v		\
 	$(RDLITE)_prf/PASS $(RDLITE)_cvr/PASS				\
 	$(WRLITE)_prf/PASS $(WRLITE)_cvr/PASS
 
@@ -121,26 +120,26 @@ $(AXLITE)_cvr/PASS: $(AXLITE_DEPS)
 
 .PHONY: $(WB2LITE)
 $(WB2LITE): $(WB2LITE)_cvr/PASS $(WB2LITE)_prf/PASS
-$(WB2LITE)_prf/PASS: $(RTL)/$(WB2LITE).v
-$(WB2LITE)_prf/PASS: $(WB2LITE).sby fwb_slave.v faxil_master.v
+$(WB2LITE)_prf/PASS: $(RTL)/$(WB2LITE).v $(WB) $(AXIL)
+$(WB2LITE)_prf/PASS: $(WB2LITE).sby
 	sby -f $(WB2LITE).sby prf
 
-$(WB2LITE)_cvr/PASS: $(RTL)/$(WB2LITE).v
-$(WB2LITE)_cvr/PASS: $(WB2LITE).sby fwb_slave.v faxil_master.v
+$(WB2LITE)_cvr/PASS: $(RTL)/$(WB2LITE).v $(WB) $(AXIL)
+$(WB2LITE)_cvr/PASS: $(WB2LITE).sby
 	sby -f $(WB2LITE).sby cvr
 
 .PHONY: $(DEMOAXI)
 $(DEMOAXI): $(DEMOAXI)_prf/PASS $(DEMOAXI)_cvr/PASS
-$(DEMOAXI)_prf/PASS: $(RTL)/$(DEMOAXI).v $(DEMOAXI).sby faxil_slave.v
+$(DEMOAXI)_prf/PASS: $(RTL)/$(DEMOAXI).v $(DEMOAXI).sby $(AXIL)
 	sby -f $(DEMOAXI).sby prf
-$(DEMOAXI)_cvr/PASS: $(RTL)/$(DEMOAXI).v $(DEMOAXI).sby faxil_slave.v
+$(DEMOAXI)_cvr/PASS: $(RTL)/$(DEMOAXI).v $(DEMOAXI).sby $(AXIL)
 	sby -f $(DEMOAXI).sby cvr
 
 .PHONY: $(XILINXDEMO)
 $(XILINXDEMO): $(XILINXDEMO)_prf/PASS $(XILINXDEMO)_cvr/PASS
-$(XILINXDEMO)_prf/PASS: $(XILINXDEMO).v $(XILINXDEMO).sby faxil_slave.v
+$(XILINXDEMO)_prf/PASS: $(XILINXDEMO).v $(XILINXDEMO).sby $(AXIL)
 	sby -f $(XILINXDEMO).sby prf
-$(XILINXDEMO)_cvr/PASS: $(XILINXDEMO).v $(XILINXDEMO).sby faxil_slave.v
+$(XILINXDEMO)_cvr/PASS: $(XILINXDEMO).v $(XILINXDEMO).sby $(AXIL)
 	sby -f $(XILINXDEMO).sby cvr
 
 .PHONY: $(XILINXFULL) xlnxfull
@@ -154,8 +153,7 @@ $(XILINXFULL)_cvr/PASS: $(XILINXFULL).v $(XILINXFULL).sby $(AXI)
 
 .PHONY: $(AXI2WB)
 $(AXI2WB)/PASS: $(RTL)/$(AXI2WB).v $(AXI2WB).sby
-$(AXI2WB)/PASS: $(WB)
-$(AXI2WB)/PASS: faxi_slave.v
+$(AXI2WB)/PASS: $(WB) $(AXI)
 $(AXI2WB)/PASS: f_order.v
 $(AXI2WB)/PASS: $(RTL)/aximwr2wbsp.v $(RTL)/aximrd2wbsp.v
 $(AXI2WB)/PASS: $(RTL)/wbarbiter.v
@@ -357,16 +355,16 @@ wbxbar_prf4x1_cheapkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 
 .PHONY: $(WBP2CLASSIC)
 $(WBP2CLASSIC): $(WBP2CLASSIC)_prf/PASS $(WBP2CLASSIC)_cvr/PASS
-$(WBP2CLASSIC)_prf/PASS:
+$(WBP2CLASSIC)_prf/PASS: $(RTL)/$(WBP2CLASSIC).v $(WB) $(WBC)
 	sby -f $(WBP2CLASSIC).sby prf
-$(WBP2CLASSIC)_cvr/PASS:
+$(WBP2CLASSIC)_cvr/PASS: $(RTL)/$(WBP2CLASSIC).v $(WB) $(WBC)
 	sby -f $(WBP2CLASSIC).sby cvr
 
 .PHONY: $(WBC2PIPELIN)
 $(WBC2PIPELIN): $(WBC2PIPELIN)_prf/PASS $(WBC2PIPELIN)_cvr/PASS
-$(WBC2PIPELIN)_prf/PASS:
+$(WBC2PIPELIN)_prf/PASS: $(RTL)/$(WBC2PIPELIN).v $(WB) $(WBC)
 	sby -f $(WBC2PIPELIN).sby prf
-$(WBC2PIPELIN)_cvr/PASS:
+$(WBC2PIPELIN)_cvr/PASS: $(RTL)/$(WBC2PIPELIN).v $(WB) $(WBC)
 	sby -f $(WBC2PIPELIN).sby cvr
 
 .PHONY: $(DEMOFULL)

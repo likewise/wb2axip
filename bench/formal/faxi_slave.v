@@ -1046,6 +1046,10 @@ module faxi_slave #(
 		assert(wr_aligned);
 
 	always @(*)
+	if (f_axi_wr_pending > 0)
+		assert(f_axi_wr_pending <= f_axi_wr_len + 1);
+
+	always @(*)
 	if ((f_axi_wr_pending > 0)&&(f_axi_wr_burst == 2'b10))
 		assert((f_axi_wr_len == 1)
 			||(f_axi_wr_len == 3)

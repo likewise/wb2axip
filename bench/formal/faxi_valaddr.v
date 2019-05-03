@@ -4,7 +4,14 @@
 //
 // Project:	Pipelined Wishbone to AXI converter
 //
-// Purpose:	
+// Purpose:	This file validates a given AXI address channel request,
+//		whether for the read or write address channels.  It can also be
+//	used outside of the address checker.
+//
+//	This property checker doesn't actually produce any formal properties
+//	itself, but rather it produces formal logic that can be used to create
+//	a formal property--whether assertion or assumption.
+//		
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC

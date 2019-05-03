@@ -959,7 +959,7 @@ module faxi_master #(
 
 	always @(*)
 		this_awsize = (f_axi_wr_pending>0) ? f_axi_wr_size : i_axi_awsize;
-		
+
 	faxi_addr #(.AW(AW)) get_next_waddr(
 		(f_axi_wr_pending>1) ? f_axi_wr_addr  : i_axi_awaddr,
 		this_awsize,
@@ -1045,6 +1045,17 @@ module faxi_master #(
 			&& f_axi_wr_burst != 2'b00)
 		assert(wr_aligned);
 
+	always @(*)
+	if (f_axi_wr_pending > 0)
+		assert(f_axi_wr_pending <= f_axi_wr_len + 1);
+
+	always @(*)
+	if ((f_axi_wr_pending > 0)&&(f_axi_wr_burst == 2'b10))
+		assert((f_axi_wr_len == 1)
+			||(f_axi_wr_len == 3)
+			||(f_axi_wr_len == 7)
+			||(f_axi_wr_len == 15));
+
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Read address checking
@@ -1077,7 +1088,7 @@ module faxi_master #(
 
 	always @(*)
 	if (i_axi_arvalid > 0)
-		assert(valid_iraddr);
+		`SLAVE_ASSUME(valid_iraddr);
 
 
 	always @(*)
