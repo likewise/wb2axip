@@ -20,6 +20,8 @@ smtbmc
 read -formal -D WBM2AXISP wbm2axisp.v
 read -formal -D WBM2AXISP faxi_master.v
 read -formal -D WBM2AXISP faxi_addr.v
+read -formal -D WBM2AXISP faxi_wstrb.v
+read -formal -D WBM2AXISP faxi_valaddr.v
 read -formal -D WBM2AXISP fwb_slave.v
 chparam -set AW 20 wbm2axisp
 prfx8:    chparam -set DW  8 wbm2axisp
@@ -59,4 +61,6 @@ prep -top wbm2axisp
 ../../rtl/wbm2axisp.v
 faxi_master.v
 faxi_addr.v
+faxi_valaddr.v
+faxi_wstrb.v
 fwb_slave.v
