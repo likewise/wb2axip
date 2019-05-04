@@ -3539,7 +3539,6 @@ module	axixbar #(
 	//
 	(* anyconst *)	reg	[DW-1:0]	f_const_data_n;
 	(* anyconst *)	reg	[DW/8-1:0]	f_const_strb_n;
-	(* anyconst *)	reg	[3-1:0]		f_const_prot_n;
 	(* anyconst *)	reg	[2-1:0]		f_const_resp_n;
 			reg	[LGNS-1:0]	f_const_slave;
 
