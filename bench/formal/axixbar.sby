@@ -19,7 +19,7 @@ prf4x8      nxm
 # cvr:  mode cover
 # cvr:  depth 64
 mode prove
-depth 20
+depth 10
 
 [engines]
 smtbmc boolector

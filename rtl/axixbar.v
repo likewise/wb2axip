@@ -88,8 +88,61 @@ module	axixbar #(
 		parameter integer C_S_AXI_ADDR_WIDTH = 32,
 		parameter integer C_S_AXI_ID_WIDTH = 2,
 		parameter	NM = 4,
-		parameter	NS = 8
+		parameter	NS = 8,
 		//
+		// SLAVE_ADDR is an array of addresses, describing each of
+		// the slave channels.  It works tightly with SLAVE_MASK,
+		// so that when (ADDR & MASK == ADDR), the channel in question
+		// has been requested.
+		//
+		// It is an internal in the setup of this core to doubly map
+		// an address, such that (addr & SLAVE_MASK[k])==SLAVE_ADDR[k]
+		// for two separate values of k.
+		//
+		// Any attempt to access an address that is a hole in this
+		// address list will result in a returned xRESP value of
+		// INTERCONNECT_ERROR (2'b11)
+		parameter	[NS*AW-1:0]	SLAVE_ADDR = {
+			3'b111,  {(AW-3){1'b0}},
+			3'b110,  {(AW-3){1'b0}},
+			3'b101,  {(AW-3){1'b0}},
+			3'b100,  {(AW-3){1'b0}},
+			3'b011,  {(AW-3){1'b0}},
+			3'b010,  {(AW-3){1'b0}},
+			4'b0001, {(AW-4){1'b0}},
+			4'b0000, {(AW-4){1'b0}} },
+		//
+		// SLAVE_MASK: is an array, much like SLAVE_ADDR, describing
+		// which of the bits in SLAVE_ADDR are relevant.  It is
+		// important to maintain for every slave that
+		// 	(~SLAVE_MASK[i] & SLAVE_ADDR[i]) == 0.
+		parameter	[NS*AW-1:0]	SLAVE_MASK =
+			(NS <= 1) ? { 4'b1111, {(AW-4){1'b0}}}
+			: { {(NS-2){ 3'b111, {(AW-3){1'b0}} }},
+				{(2){ 4'b1111, {(AW-4){1'b0}}}} },
+		//
+		// OPT_LOWPOWER: If set, it forces all unused values to zero,
+		// preventing them from unnecessarily toggling.  This will
+		// raise the logic count of the core, but might also lower
+		// the power used by the interconnect and the bus driven wires
+		// which (in my experience) tend to have a high fan out.
+		parameter [0:0]	OPT_LOWPOWER = 0,
+		//
+		// OPT_LINGER: Set this to the number of clocks an idle
+		// channel shall be left open before being closed.  Once
+		// closed, it will take a minimum of two clocks before the
+		// channel can be opened and data transmitted through it again.
+		parameter	OPT_LINGER = 4,
+		//
+		// OPT_QOS: If set, the QOS transmission values will be honored
+		// when determining who wins arbitration for accessing a given
+		// slave.  (This feature is not yet implemented)
+		// parameter [0:0]	OPT_QOS = 1,
+		//
+		// LGMAXBURST: Specifies the log based two of the maximum
+		// number of transactions that may be outstanding.  Of
+		// necessity, this must me more than 8.
+		parameter	LGMAXBURST = 9
 	) (
 		input	wire	S_AXI_ACLK,
 		input	wire	S_AXI_ARESETN,
@@ -187,55 +240,6 @@ module	axixbar #(
 	localparam	IW = C_S_AXI_ID_WIDTH;
 	localparam	AW = C_S_AXI_ADDR_WIDTH;
 	localparam	DW = C_S_AXI_DATA_WIDTH;
-	//
-	// SLAVE_ADDR is an array of addresses, describing each of the slave
-	// channels.  It works tightly with SLAVE_MASK, so that when
-	// (ADDR & MASK == ADDR), the channel in question has been requested.
-	//
-	// It is an internal in the setup of this core to doubly map an address,
-	// such that (addr & SLAVE_MASK[k])==SLAVE_ADDR[k] for two separate
-	// values of k.
-	//
-	// Any attempt to access an address that is a hole in this address list
-	// will result in a returned xRESP value of INTERCONNECT_ERROR (2'b11)
-	parameter	[NS*AW-1:0]	SLAVE_ADDR = {
-		3'b111,  {(AW-3){1'b0}},
-		3'b110,  {(AW-3){1'b0}},
-		3'b101,  {(AW-3){1'b0}},
-		3'b100,  {(AW-3){1'b0}},
-		3'b011,  {(AW-3){1'b0}},
-		3'b010,  {(AW-3){1'b0}},
-		4'b0001, {(AW-4){1'b0}},
-		4'b0000, {(AW-4){1'b0}} };
-	//
-	// SLAVE_MASK: is an array, much like SLAVE_ADDR, describing which of
-	// the bits in SLAVE_ADDR are relevant.  It is important to maintain
-	// for every slave that (~SLAVE_MASK[i] & SLAVE_ADDR[i]) == 0.
-	parameter	[NS*AW-1:0]	SLAVE_MASK =
-		(NS <= 1) ? { 4'b1111, {(AW-4){1'b0}}}
-		: { {(NS-2){ 3'b111, {(AW-3){1'b0}} }},
-			{(2){ 4'b1111, {(AW-4){1'b0}}}} };
-	//
-	// OPT_LOWPOWER: If set, it forces all unused values to zero, preventing
-	// them from unnecessarily toggling.  This will raise the logic count
-	// of the core.
-	parameter [0:0]	OPT_LOWPOWER = 0;
-	//
-	// OPT_LINGER: Set this to the number of clocks an idle channel shall
-	// be left open before being closed.  Once closed, it will take a
-	// minimum of two clocks before the channel can be opened and data
-	// transmitted through it again.
-	parameter	OPT_LINGER = 4;
-	//
-	// OPT_QOS: If set, the QOS transmission values will be honored when
-	// determining who wins arbitration for accessing a given slave
-	parameter [0:0]	OPT_QOS = 1;
-	//
-	// LGMAXBURST: Specifies the log based two of the maximum number of
-	// transactions that may be outstanding.  Of necessity, this must me
-	// more than 8.
-	parameter	LGMAXBURST = 9;
-	//
 	//
 	// Local parameters, derived from those above
 	localparam	LGLINGER = (OPT_LINGER>1) ? $clog2(OPT_LINGER+1) : 1;
@@ -556,7 +560,7 @@ module	axixbar #(
 			m_awsize[N]  = M_AXI_AWSIZE[ N* 3 +: 3];
 			m_awburst[N] = M_AXI_AWBURST[N* 2 +: 2];
 			m_awlock[N]  = M_AXI_AWLOCK[ N];
-			m_awcache[N] = M_AXI_AWCACHE[N* 4 +: 2];
+			m_awcache[N] = M_AXI_AWCACHE[N* 4 +: 4];
 			m_awprot[N]  = M_AXI_AWPROT[ N* 3 +: 3];
 			m_awqos[N]   = M_AXI_AWQOS[  N* 4 +: 4];
 		end
@@ -1132,6 +1136,10 @@ module	axixbar #(
 				r_wlast[N] <= 0;
 			end
 		end
+
+		always @(posedge S_AXI_ACLK)
+		if (!wdata_expected[N])
+			r_wid[N] <= m_awid[N];
 
 		//
 		//
@@ -2174,6 +2182,49 @@ module	axixbar #(
 	initial	assert(NS >= 1);
 	initial	assert(NM >= 1);
 
+	reg	f_past_valid;
+	initial	f_past_valid = 0;
+	always @(posedge S_AXI_ACLK)
+		f_past_valid <= 1;
+
+`ifdef	VERIFIC
+`define	INITIAL_CHECK	assume
+`else
+`define	INITIAL_CHECK	assert
+`endif // VERIFIC
+	always @(*)
+	if (!f_past_valid)
+	begin
+		`INITIAL_CHECK(!S_AXI_ARESETN);
+		`INITIAL_CHECK(r_awvalid == 0);
+		`INITIAL_CHECK(r_wvalid == 0);
+		`INITIAL_CHECK(r_arvalid == 0);
+		`INITIAL_CHECK(M_AXI_BVALID == 0);
+		`INITIAL_CHECK(M_AXI_RVALID == 0);
+		`INITIAL_CHECK(mwgrant == 0);
+		`INITIAL_CHECK(mrgrant == 0);
+		`INITIAL_CHECK(mwfull == 0);
+		`INITIAL_CHECK(mrfull == 0);
+		`INITIAL_CHECK(&mwempty);
+		`INITIAL_CHECK(&mrempty);
+		for(iN=0; iN<NM; iN=iN+1)
+		begin
+			`INITIAL_CHECK(r_bvalid[iN] == 0);
+			`INITIAL_CHECK(r_rvalid[iN] == 0);
+			`INITIAL_CHECK(wgrant[iN] == 0);
+			`INITIAL_CHECK(rgrant[iN] == 0);
+			`INITIAL_CHECK(w_mawpending[iN] == 0);
+			`INITIAL_CHECK(w_mwpending[iN] == 0);
+			`INITIAL_CHECK(w_mrpending[iN] == 0);
+			`INITIAL_CHECK(mwnearfull == 0);
+			`INITIAL_CHECK(mrnearfull == 0);
+		end
+
+		`INITIAL_CHECK(S_AXI_AWVALID == 0);
+		`INITIAL_CHECK(S_AXI_WVALID == 0);
+		`INITIAL_CHECK(S_AXI_RVALID == 0);
+	end
+
 	generate for(N=0; N<NM; N=N+1)
 	begin : CHECK_MASTER_GRANTS
 
@@ -2201,6 +2252,10 @@ module	axixbar #(
 		always @(*)
 		if (wrequest[N][NS])
 			assert(wrequest[N][NS-1:0] == 0);
+
+		always @(*)
+		if (wgrant[N] != 0)
+			assert(mwindex[N] <= NS);
 
 
 		// Read grants
@@ -2411,17 +2466,11 @@ module	axixbar #(
 				+ ((fm_wr_pending[N]==0)&&(r_wvalid[N]&&r_wlast[N]) ? 1:0)
 				+ (M_AXI_BVALID[N] ? 1:0));
 
-/*
-		always @(*)
-		if (!mwgrant[N])
-		begin
-			assert(!M_AXI_BVALID[N]);
-
-			assert(fm_awr_nbursts[N]==(M_AXI_AWREADY[N] ? 0:1));
-			assert(w_mawpending[N] == 0);
-			assert(w_mwpending[N] == 0);
-		end
-*/
+		//
+		// Insist on a minimum pace for the incoming wvalid items
+		//
+		// While not essential to reality, this is essential to keeping
+		// the proof moving along
 		always @(posedge S_AXI_ACLK)
 		if (S_AXI_ARESETN)
 		begin
@@ -2851,7 +2900,7 @@ module	axixbar #(
 		end
 
 		always @(*)
-		if (mwgrant[N] && (mwindex[N] < NS))
+		if (mwgrant[N] && !wgrant[N][NS])
 		begin
 			assert(fm_awr_nbursts[N] == fs_awr_nbursts[mwindex[N]]
 					+ unwr_bursts[N]);
@@ -2865,11 +2914,11 @@ module	axixbar #(
 
 			assert(((fm_awr_nbursts[N]
 				- (r_awvalid[N] ? 1:0)
-				- (s_axi_awvalid[N] ? 1:0)
+				- (s_axi_awvalid[mwindex[N]] ? 1:0)
 				- (r_bvalid[N] ? 1:0)
 				- (M_AXI_BVALID[N] ? 1:0)
-				- (fs_wr_pending[N] > 0)) > 0)
-				||(!s_axi_bvalid[N]));
+				- ((fs_wr_pending[mwindex[N]] > 0)? 1:0)) > 0)
+				||(!s_axi_bvalid[mwindex[N]]));
 
 			assume(((fm_wrid_nbursts[N]
 				-((r_awvalid[N]&&r_awid[N]==fm_wr_checkid[N]) ? 1:0)
@@ -2900,19 +2949,16 @@ module	axixbar #(
 			end
 
 			if (r_awvalid[N])
-				assert((fm_wr_pending[N] == r_awlen[N]+1)
-					||((fm_wr_pending[N] == r_awlen[N])
-						&& r_wvalid[N]));
-			else if (s_axi_awvalid[mwindex[N]])
+			begin end else if (s_axi_awvalid[mwindex[N]])
 			begin
-				if (fs_wr_pending[N] > 0)
-					assert(fs_wr_pending[N] ==unwr_data[N]);
+				if (fs_wr_pending[mwindex[N]] > 0)
+					assert(fs_wr_pending[mwindex[N]] ==unwr_data[N]);
 				else
-				   assert((fm_wr_pending[N] == s_axi_awlen[N]+1)
-					||(fm_wr_pending[N] == s_axi_awlen[N]
-					    &&(r_wvalid[N] || s_axi_wvalid[N]))
+				   assert((fm_wr_pending[N] == s_axi_awlen[mwindex[N]]+1)
+					||(fm_wr_pending[N] == s_axi_awlen[mwindex[N]]
+					    &&(r_wvalid[N] || s_axi_wvalid[mwindex[N]]))
 					||(fm_wr_pending[N] == 0)
-					||(fm_wr_pending[N]==s_axi_awlen[N]-1));
+					||(fm_wr_pending[N]==s_axi_awlen[mwindex[N]]-1));
 			end else begin
 				assert(fm_wr_pending[N] + unwr_data[N]
 					== fs_wr_pending[mwindex[N]]);
@@ -2932,31 +2978,47 @@ module	axixbar #(
 				end
 				//
 				//
-				if (fm_wr_pending[N]>1)
+				if ((fm_wr_pending[N]>0)
+					&&!r_wlast[N]
+					&&!S_AXI_WLAST[mwindex[N]]
+					&&(fs_wr_pending[mwindex[N]]>0))
 				begin
-				assert(fm_wr_incr[N] ==fs_wr_incr[ mwindex[N]]);
+				if (fm_wr_pending[N]>1)
+					assert(fm_wr_incr[N] ==fs_wr_incr[ mwindex[N]]);
 				assert(fm_wr_burst[N]==fs_wr_burst[mwindex[N]]);
 				assert(fm_wr_size[N] ==fs_wr_size[ mwindex[N]]);
 				assert(fm_wr_len[N]  ==fs_wr_len[  mwindex[N]]);
-				end
+				end else if ((fm_wr_pending[N]>0)&&(r_awvalid))
+				begin
+				assert(fm_wr_burst[N]==r_awburst[N]);
+				assert(fm_wr_size[N] ==r_awsize[ N]);
+				assert(fm_wr_len[N]  ==r_awlen[  N]);
+				end else if ((fm_wr_pending[N]>1)&&(S_AXI_AWVALID[mwindex[N]]))
+				begin
+				for(iM=0; iM<NS; iM=iM+1) if (wgrant[N][iM])
+				begin
+				assert(fm_wr_burst[N]==S_AXI_AWBURST[iM*2+:2]);
+				assert(fm_wr_size[N] ==S_AXI_AWSIZE[ iM*3+:3]);
+				assert(fm_wr_len[N]  ==S_AXI_AWLEN[  iM*8+:8]);
+				end end
 
 				if (fm_wr_ckvalid[N])
-					assert(fs_wr_ckvalid[N]);
+					assert(fs_wr_ckvalid[mwindex[N]]);
 				else if (fm_wr_pending[N] > 0)
-					assert(!fs_wr_ckvalid[N]);
+					assert(!fs_wr_ckvalid[mwindex[N]]);
 			end
 
 			if ((r_awvalid[N] || s_axi_awvalid[mwindex[N]])
 				&& fm_wr_ckvalid[N])
 			begin
 				assert((s_axi_awvalid[mwindex[N]]
-					    && s_axi_awid[N] == fm_wr_checkid[N])
+					    && s_axi_awid[mwindex[N]] == fm_wr_checkid[N])
 					||(r_awvalid[N]
 					    && r_awid[N] == fm_wr_checkid[N]));
 			end
 
 			if (!s_axi_awvalid[mwindex[N]]
-				&& (r_awvalid[mwindex[N]]
+				&& (r_awvalid[N]
 					&& !wrequest[N][mwindex[N]]))
 			begin
 				assert((fm_wr_pending[N]== r_awlen[N]
@@ -2965,34 +3027,13 @@ module	axixbar #(
 			end
 
 			if (r_wvalid[N] && s_axi_wvalid[mwindex[N]]
-						&& !S_AXI_WLAST[N])
+						&& !S_AXI_WLAST[mwindex[N]])
 			begin
 				if (s_axi_awvalid[mwindex[N]])
-					assert(fs_wr_pending[N] == 0);
+					assert(fs_wr_pending[mwindex[N]] == 0);
 				else
-					assert(fs_wr_pending[N] >= 1+(r_wlast[N]? 1:0));
+					assert(fs_wr_pending[mwindex[N]] >= 1+(r_wlast[N]? 1:0));
 			end
-/*
-			if (S_AXI_AWVALID[mwindex[N]] || s_axi_awvalid[mwindex[N]])
-			begin
-				assert(fs_wr_pending[N] == 0);
-			end else begin
-				assert(fs_wr_pending[mwindex[N]] + unwr_pending[N]
-					== fm_wr_pending[N]);
-			end
-
-		end else if (!mwgrant[N] || (mwindex[N]==NS))
-		begin
-			if (!mwgrant[N])
-			begin
-				assert(fm_awr_nbursts[N] == unwr_bursts[N]);
-				// assert(fm_wr_pending[N] == 0);
-			end else begin
-				assert(fm_awr_nbursts[N] >=
-						(r_awvalid[N] ? 1:0)
-						+(M_AXI_BVALID[N]  ? 1:0));
-			end
-*/
 		end
 
 		always @(*)
@@ -3004,7 +3045,7 @@ module	axixbar #(
 				&& (fm_wr_pending[N] > 0)));
 
 		always @(*)
-		if (mwgrant[N] && (mwindex[N]==NS))
+		if (mwgrant[N] && wgrant[N][NS])
 		begin
 			assert(fm_awr_nbursts[N] <= 1);
 			if (!r_awvalid[N] && (fm_awr_nbursts[N] > 0))
@@ -3190,7 +3231,9 @@ module	axixbar #(
 		//
 		// Verify the contents of the write skid buffers
 		//
-		wire	skid_awvalid, awr_aligned, skid_wvalid;
+		wire			skid_awvalid, awr_aligned, skid_wvalid;
+		wire	[AW-1:0]	fnext_wr_addr_1, fnext_wr_addr_2;
+		wire	[7:0]		fwr_incr_1, fwr_incr_2;
 
 		// First the write address skid buffer
 		faxi_valaddr #(.C_AXI_DATA_WIDTH(DW), .C_AXI_ADDR_WIDTH(AW))
@@ -3200,7 +3243,11 @@ module	axixbar #(
 
 		always @(*)
 		if (r_awvalid[N])
+		begin
 			assert(skid_awvalid);
+			if (r_awlock[N])
+				assert(!r_awcache[N][0]);
+		end
 
 
 		faxi_wstrb #(.C_AXI_DATA_WIDTH(DW))
@@ -3210,6 +3257,14 @@ module	axixbar #(
 		always @(*)
 		if (r_wvalid[N] && !wdata_expected[N])
 			assert(skid_wvalid);
+
+		faxi_addr #(.AW(AW)) get_r_waddr_next_1(fr_waddr, fm_wr_size[N],
+			fm_wr_burst[N], fm_wr_len[N],
+			fwr_incr_1, fnext_wr_addr_1);
+
+		faxi_addr #(.AW(AW)) get_r_waddr_next_2(slave_waddr,
+			fm_wr_size[N], fm_wr_burst[N], fm_wr_len[N],
+			fwr_incr_2, fnext_wr_addr_2);
 
 		// Create a skid buffer for the write-channel address
 		reg	[AW-1:0]	fr_waddr, fm_waddr, slave_waddr;
@@ -3228,9 +3283,51 @@ module	axixbar #(
 		if (m_wvalid[N] && slave_waccepts[N])
 			slave_waddr <= fm_waddr;
 
+		always @(posedge S_AXI_ACLK)
+		if (r_wvalid[N] && !r_wlast[N])
+		begin
+			assert(fm_wr_pending[N] > 0);
+			assert(fnext_wr_addr_1 == fm_wr_addr[N]);
+		end
+
 		always @(*)
-		if (mwgrant[N] && mwindex[N] < NS && s_axi_wvalid[mwindex[N]])
-			assert(slave_waddr == fs_wr_addr[mwindex[N]]);
+		if (!wdata_expected[N])
+		begin
+			if (!r_awvalid[N])
+				assert(fm_wr_pending[N] == 0);
+
+		end
+
+		always @(*)
+		if (r_awvalid[N])
+		begin
+			assert((fm_wr_pending[N] == r_awlen[N]+1)
+				||((fm_wr_pending[N] == r_awlen[N])
+					&& r_wvalid[N]));
+
+			assert(fm_wr_burst[N] == r_awburst[N]);
+			assert(fm_wr_size[N]  == r_awsize[N]);
+			assert(fm_wr_len[N]   == r_awlen[N]);
+			if (!r_wvalid[N] && fm_wr_pending[N] > 0)
+				assert(fm_wr_addr[N]  == r_awaddr[N]);
+		end
+
+		always @(*)
+		if (mwgrant[N] && !wgrant[N][NS] && s_axi_wvalid[mwindex[N]])
+		begin
+			if ((fs_wr_pending[mwindex[N]]>0)
+				&&(!s_axi_wvalid[mwindex[N]]||!S_AXI_WLAST[mwindex[N]]))
+				assert(wdata_expected[N]);
+			if (fs_wr_pending[mwindex[N]]>0)
+				assert(slave_waddr == fs_wr_addr[mwindex[N]]);
+			else for(iM=0; iM<NS; iM=iM+1)
+				if (wgrant[N][iM])
+				assert(S_AXI_AWVALID[iM] && slave_waddr == S_AXI_AWADDR[iM*AW+:AW]);
+		end
+
+		always @(*)
+		if ((!wdata_expected[N]||!mwgrant[N]) && r_wvalid[N])
+			assert(r_awvalid[N] && fr_waddr == r_awaddr[N]);
 
 		//
 		// Verify the contents of the read skid buffer
@@ -3245,7 +3342,11 @@ module	axixbar #(
 
 		always @(*)
 		if (r_arvalid[N])
+		begin
 			assert(skid_arvalid);
+			if (r_arlock[N])
+				assert(!r_arcache[N][0]);
+		end
 
 
 	end endgenerate
@@ -3409,6 +3510,7 @@ module	axixbar #(
 		if (M_AXI_RVALID[N] && rgrant[N][NS])
 			assert(M_AXI_RRESP[2*N+:2]==INTERCONNECT_ERROR);
 	end endgenerate
+`endif	// COVER_CHECKS
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -3423,6 +3525,7 @@ module	axixbar #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+	(* anyconst *)	reg			f_run_negation_check;
 	(* anyconst *)	reg	[LGNM-1:0]	f_const_source;
 	(* anyconst *)	reg	[AW-1:0]	f_const_addr;
 	(* anyconst *)	reg	[AW-1:0]	f_const_addr_n;
@@ -3452,7 +3555,7 @@ module	axixbar #(
 				f_const_slave = iM;
 		end
 
-		assume(f_const_slave < NS);
+		assume((f_const_slave < NS)||(!f_run_negation_check));
 	end
 
 	reg	[AW-1:0]	f_awaddr;
@@ -3465,6 +3568,7 @@ module	axixbar #(
 	// The assumption check: assume our negated values are not found on
 	// the inputs
 	always @(*)
+	if (f_run_negation_check)
 	begin
 		if (M_AXI_AWVALID[f_const_source])
 		begin
@@ -3514,7 +3618,13 @@ module	axixbar #(
 
 	// Proof check: Prove these values are not found on our outputs
 	always @(*)
+	if (f_run_negation_check)
 	begin
+		if (f_const_id_n == fm_wr_checkid[f_const_source])
+			assert(fm_wrid_nbursts[f_const_source] == 0);
+		else if (IW==1)
+			assert(fm_wrid_nbursts[f_const_source]==fs_awr_nbursts[f_const_source]);
+
 		if (r_awvalid[f_const_source])
 		begin
 			assert(r_awaddr[f_const_source] != f_const_addr_n);
@@ -3543,6 +3653,13 @@ module	axixbar #(
 		begin
 			assert(S_AXI_WDATA[f_const_slave*DW+:DW] != f_const_data_n);
 			assert(S_AXI_WSTRB[f_const_slave*(DW/8)+:(DW/8)] != f_const_strb_n);
+		end
+		if (wgrant[f_const_source][f_const_slave])
+		begin
+			if (f_const_id_n == fs_wr_checkid[f_const_slave])
+				assert(fs_wrid_nbursts[f_const_slave] == 0);
+			else if (IW==1)
+				assert(fs_wrid_nbursts[f_const_slave]==fs_awr_nbursts[f_const_slave]);
 		end
 		if (r_arvalid[f_const_source])
 		begin
@@ -3589,20 +3706,23 @@ module	axixbar #(
 			assert(M_AXI_RID[f_const_source*IW+:IW]!=f_const_id_n);
 		end
 	end
-`endif	// COVER_CHECKS
 
 	////////////////////////////////////////////////////////////////////////
 	//
-	// (Careless) constraining assumptions
+	// Artificially constraining assumptions
+	//
+	// Ideally, this section should be empty--there should be no
+	// assumptions here.  The existence of these assumptions should
+	// give you an idea of where I'm at with this project.
 	//
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+	localparam [0:0]	OPT_READS  = 0;
+	localparam [0:0]	OPT_WRITES = 1;
+
 	generate for(N=0; N<NM; N=N+1)
 	begin
-
-		localparam [0:0]	OPT_READS  = 0;
-		localparam [0:0]	OPT_WRITES = 1;
 
 		if (!OPT_WRITES)
 		begin
@@ -3630,27 +3750,21 @@ module	axixbar #(
 				assert(fm_rd_nbursts[N] == 0);
 		end
 
+		always @(*)
+			assume(!rrequest[N][NS]);
+		always @(*)
+			assert(!rgrant[N][NS]);
+	end endgenerate
 
-		always@(*)
-			assert(OPT_READS | OPT_WRITES);
-		always @(*)
-			assume(swgrant[NS-1:1] == 0);
-		always @(*)
-			assume(mwgrant[NM-1:1] == 0);
-		always @(*)
-			assume(srgrant[NS-1:1] == 0);
-		always @(*)
-			assume(mrgrant[NM-1:1] == 0);
+
+	always@(*)
+		assert(OPT_READS | OPT_WRITES);
+	always @(*)
+		assume(srgrant[NS-1:1] == 0);
+	always @(*)
+		assume(mrgrant[NM-1:1] == 0);
 	//	always @(*)
 	//	for(iN=0; iN<NM; iN=iN+1)
 	//		assume(fm_rd_nbursts[iN] <= 1);
-		always @(*)
-		for(iN=0; iN<NM; iN=iN+1)
-			assume(!rrequest[iN][NS]);
-		always @(*)
-		for(iN=0; iN<NM; iN=iN+1)
-			assert(!rgrant[iN][NS]);
-	end endgenerate
-
 `endif
 endmodule

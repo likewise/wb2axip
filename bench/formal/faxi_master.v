@@ -1212,9 +1212,13 @@ module faxi_master #(
 		if (i_axi_awvalid && i_axi_awlock)
 		begin
 			`SLAVE_ASSUME(!i_axi_awcache[0]);
-			if (f_axi_wr_checkid == f_axi_rd_checkid)
-				`SLAVE_ASSUME(f_axi_rdid_nbursts == 0);
-			`SLAVE_ASSUME(f_axi_wrid_nbursts == 0);
+			//
+			// Not sure how to check these, although they
+			// are worth checking
+			//
+			// if (f_axi_wr_checkid == f_axi_rd_checkid)
+			//	`SLAVE_ASSUME(f_axi_rdid_nbursts == 0);
+			// `SLAVE_ASSUME(f_axi_wrid_nbursts == 0);
 		end
 
 		always @(*)
