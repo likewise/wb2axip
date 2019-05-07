@@ -1,4 +1,5 @@
 [tasks]
+cvr
 prfx8		prf
 prfx16		prf
 prfe32		prf
@@ -10,8 +11,10 @@ prfx512		prf
 prfx1024	prf
 
 [options]
-mode prove
-depth 8
+prf: mode prove
+prf: depth 15
+cvr: mode cover
+cvr: depth 48
 
 [engines]
 smtbmc
@@ -33,6 +36,7 @@ prfx128:  chparam -set DW 32 wbm2axisp
 prfx256:  chparam -set DW 32 wbm2axisp
 prfx512:  chparam -set DW 32 wbm2axisp
 prfx1024: chparam -set DW 32 wbm2axisp
+cvr:      chparam -set DW 32 wbm2axisp
 #
 prfx8:    chparam -set C_AXI_DATA_WIDTH    8 wbm2axisp
 prfx16:   chparam -set C_AXI_DATA_WIDTH   16 wbm2axisp
@@ -43,6 +47,7 @@ prfx128:  chparam -set C_AXI_DATA_WIDTH  128 wbm2axisp
 prfx256:  chparam -set C_AXI_DATA_WIDTH  256 wbm2axisp
 prfx512:  chparam -set C_AXI_DATA_WIDTH  512 wbm2axisp
 prfx1024: chparam -set C_AXI_DATA_WIDTH 1024 wbm2axisp
+cvr:      chparam -set C_AXI_DATA_WIDTH   32 wbm2axisp
 #
 prfx8:    chparam -set C_AXI_ADDR_WIDTH   20 wbm2axisp
 prfx16:   chparam -set C_AXI_ADDR_WIDTH   20 wbm2axisp
@@ -54,6 +59,7 @@ prfx128:  chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
 prfx256:  chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
 prfx512:  chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
 prfx1024: chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
+cvr:      chparam -set C_AXI_ADDR_WIDTH 22 wbm2axisp
 #
 prep -top wbm2axisp
 
