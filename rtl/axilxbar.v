@@ -1760,7 +1760,7 @@ module	axilxbar #(
 
 		always @(*)
 		if (S_AXI_ARESETN)
-			assert(fm_wr_outstanding[N] >= 
+			assert(fm_wr_outstanding[N] >=
 				(M_AXI_WREADY[N] ? 0:1)
 				+ (M_AXI_BVALID[N]? 1:0));
 
@@ -1790,13 +1790,13 @@ module	axilxbar #(
 		//
 		always @(*)
 		if (S_AXI_ARESETN)
-			assert(fm_rd_outstanding[N] >= 
+			assert(fm_rd_outstanding[N] >=
 				(M_AXI_ARREADY[N] ? 0:1)
 				+(M_AXI_RVALID[N] ? 1:0));
 
 		always @(*)
 		if (!mrgrant[N] || rgrant[N][NS])
-			assert(fm_rd_outstanding[N] == 
+			assert(fm_rd_outstanding[N] ==
 				(M_AXI_ARREADY[N] ? 0:1)
 				+(M_AXI_RVALID[N] ? 1:0));
 
@@ -1884,7 +1884,7 @@ module	axilxbar #(
 			.f_axi_awr_outstanding(fs_awr_outstanding[M]));
 
 		always @(*)
-		assert(fs_wr_outstanding[M] + (S_AXI_WVALID[M] ? 1:0) 
+		assert(fs_wr_outstanding[M] + (S_AXI_WVALID[M] ? 1:0)
 			<= fs_awr_outstanding[M] + (S_AXI_AWVALID[M]? 1:0));
 
 		always @(*)
@@ -2128,6 +2128,34 @@ module	axilxbar #(
 		if (M_AXI_RVALID[N] && rgrant[N][NS])
 			assert(M_AXI_RRESP[2*N+:2]==INTERCONNECT_ERROR);
 	end endgenerate
+
+	reg	multi_write_hit, multi_read_hit;
+
+	initial	multi_write_hit = 0;
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN)
+		multi_write_hit <= 0;
+	else if (fm_awr_outstanding[0] > 2 && !wgrant[0][NS])
+		multi_write_hit <= 1;
+
+	initial	multi_read_hit = 0;
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN)
+		multi_read_hit <= 0;
+	else if (fm_rd_outstanding[0] > 2 && !rgrant[0][NS])
+		multi_read_hit <= 1;
+
+	always @(*)
+		cover(multi_write_hit);
+
+	always @(*)
+		cover(multi_read_hit);
+
+	always @(*)
+		cover(S_AXI_ARESETN && multi_write_hit && fm_awr_outstanding[N] == 0);
+
+	always @(*)
+		cover(S_AXI_ARESETN && multi_read_hit && fm_rd_outstanding[N] == 0);
 
 	////////////////////////////////////////////////////////////////////////
 	//
