@@ -152,17 +152,6 @@ module faxil_master #(
 	always @(posedge i_clk)
 		f_past_valid <= 1'b1;
 
-	generate if (F_OPT_ASSUME_RESET)
-	begin : ASSUME_INIITAL_RESET
-		always @(*)
-		if (!f_past_valid)
-			assume(!i_axi_reset_n);
-	end else begin : ASSERT_INIITAL_RESET
-		always @(*)
-		if (!f_past_valid)
-			assert(!i_axi_reset_n);
-	end endgenerate
-
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -170,6 +159,17 @@ module faxil_master #(
 	//
 	//
 	////////////////////////////////////////////////////////////////////////
+	generate if (F_OPT_ASSUME_RESET)
+	begin : ASSUME_INITIAL_RESET
+		always @(*)
+		if (!f_past_valid)
+			assume(!i_axi_reset_n);
+	end else begin : ASSERT_INITIAL_RESET
+		always @(*)
+		if (!f_past_valid)
+			assert(!i_axi_reset_n);
+	end endgenerate
+
 
 	//
 	// If asserted, the reset must be asserted for a minimum of 16 clocks
@@ -204,6 +204,10 @@ module faxil_master #(
 
 	end endgenerate
 
+	//
+	// All of the xVALID signals *MUST* be set low on the clock following
+	// a reset.  Not in the spec, but also checked here is that they must
+	// also be set low initially.
 	always @(posedge i_clk)
 	if ((!f_past_valid)||(!$past(i_axi_reset_n)))
 	begin
@@ -264,7 +268,7 @@ module faxil_master #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	// Stability assumptions
+	// Stability properties--what happens if valid and not ready
 	//
 	//
 	////////////////////////////////////////////////////////////////////////
@@ -275,14 +279,14 @@ module faxil_master #(
 	if ((f_past_valid)&&($past(i_axi_reset_n)))
 	begin
 		// Write address channel
-		if ((f_past_valid)&&($past(i_axi_awvalid))&&(!$past(i_axi_awready)))
+		if ((f_past_valid)&&($past(i_axi_awvalid && !i_axi_awready)))
 		begin
 			`SLAVE_ASSUME(i_axi_awvalid);
 			`SLAVE_ASSUME($stable(i_axi_awaddr));
 		end
 
 		// Write data channel
-		if ((f_past_valid)&&($past(i_axi_wvalid))&&(!$past(i_axi_wready)))
+		if ((f_past_valid)&&($past(i_axi_wvalid && !i_axi_wready)))
 		begin
 			`SLAVE_ASSUME(i_axi_wvalid);
 			`SLAVE_ASSUME($stable(i_axi_wstrb));
@@ -290,20 +294,20 @@ module faxil_master #(
 		end
 
 		// Incoming Read address channel
-		if ((f_past_valid)&&($past(i_axi_arvalid))&&(!$past(i_axi_arready)))
+		if ((f_past_valid)&&($past(i_axi_arvalid && !i_axi_arready)))
 		begin
 			`SLAVE_ASSUME(i_axi_arvalid);
 			`SLAVE_ASSUME($stable(i_axi_araddr));
 		end
 
-		if ((f_past_valid)&&($past(i_axi_rvalid))&&(!$past(i_axi_rready)))
+		if ((f_past_valid)&&($past(i_axi_rvalid && !i_axi_rready)))
 		begin
 			`SLAVE_ASSERT(i_axi_rvalid);
 			`SLAVE_ASSERT($stable(i_axi_rresp));
 			`SLAVE_ASSERT($stable(i_axi_rdata));
 		end
 
-		if ((f_past_valid)&&($past(i_axi_bvalid))&&(!$past(i_axi_bready)))
+		if ((f_past_valid)&&($past(i_axi_bvalid && !i_axi_bready)))
 		begin
 			`SLAVE_ASSERT(i_axi_bvalid);
 			`SLAVE_ASSERT($stable(i_axi_bresp));
@@ -328,14 +332,20 @@ module faxil_master #(
 	//
 	generate if (F_AXI_MAXWAIT > 0)
 	begin : CHECK_STALL_COUNT
-		//
-		// AXI write address channel
-		//
-		//
 		reg	[(F_LGDEPTH-1):0]	f_axi_awstall,
 						f_axi_wstall,
 						f_axi_arstall;
 
+		//
+		// AXI write address channel
+		//
+		// Count the number of times AWVALID is true while AWREADY
+		// is false.  These are stalls, and we want to insist on a
+		// minimum number of them.  However, if BVALID && !BREADY,
+		// then there's a reason for not accepting anything more.
+		// Similarly, many cores will only ever accept one request
+		// at a time, hence we won't count things as stalls if
+		// WR-PENDING > 0.
 		initial	f_axi_awstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_awvalid)||(i_axi_awready))
@@ -354,7 +364,10 @@ module faxil_master #(
 		//
 		// AXI write data channel
 		//
-		//
+		// Count the number of clock cycles that the write data
+		// channel is stalled, that is while WVALID && !WREADY.
+		// Since things can back up if BVALID & !BREADY, we avoid
+		// counting clock cycles in that circumstance
 		initial	f_axi_wstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_wvalid)||(i_axi_wready))
@@ -373,7 +386,12 @@ module faxil_master #(
 		//
 		// AXI read address channel
 		//
-		//
+		// Similar to the first two above, once the master raises
+		// ARVALID, insist that the slave respond within a minimum
+		// number of clock cycles.  Exceptions include any time
+		// RVALID is true, since that can back up the whole system,
+		// and any time the number of bursts is greater than zero,
+		// since many slaves can only accept one request at a time.
 		initial	f_axi_arstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_arvalid)||(i_axi_arready))
@@ -386,12 +404,28 @@ module faxil_master #(
 
 	end endgenerate
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+	// Insist upon a maximum delay before any response is accepted
+	//
+	// These are separate from the earlier ones, in case you wish to
+	// control them separately.  For example, an interconnect might be
+	// forced to let a channel wait indefinitely for access, but it might
+	// not be appropriate to require the response to be able to wait
+	// indefinitely as well
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
 	generate if (F_AXI_MAXRSTALL > 0)
-	begin
+	begin : CHECK_RESPONSE_STALLS
 		reg	[(F_LGDEPTH-1):0]	f_axi_bstall,
 						f_axi_rstall;
 
 		// AXI write response channel
+		//
+		// Insist on a maximum number of clocks that BVALID can be
+		// high while BREADY is low
 		initial	f_axi_bstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_bvalid)||(i_axi_bready))
@@ -403,6 +437,9 @@ module faxil_master #(
 			`SLAVE_ASSUME(f_axi_bstall < F_AXI_MAXRSTALL);
 
 		// AXI read response channel
+		//
+		// Insist on a maximum number of clocks taht RVALID can be
+		// high while RREADY is low
 		initial	f_axi_rstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_rvalid)||(i_axi_rready))
@@ -520,19 +557,17 @@ module faxil_master #(
 	// bursts.
 	//
 	//
+	// A unique feature to the backpressure mechanism within AXI is that
+	// we have to reset our delay counters in the case of any push back,
+	// since the response can't move forward if the master isn't (yet)
+	// ready for it.
+	//
 	////////////////////////////////////////////////////////////////////////
 	generate if (F_AXI_MAXDELAY > 0)
 	begin : CHECK_MAX_DELAY
 
 		reg	[(F_LGDEPTH-1):0]	f_axi_wr_ack_delay,
 						f_axi_rd_ack_delay;
-
-		initial	f_axi_rd_ack_delay = 0;
-		always @(posedge i_clk)
-		if ((!i_axi_reset_n)||(i_axi_rvalid)||(f_axi_rd_outstanding==0))
-			f_axi_rd_ack_delay <= 0;
-		else
-			f_axi_rd_ack_delay <= f_axi_rd_ack_delay + 1'b1;
 
 		initial	f_axi_wr_ack_delay = 0;
 		always @(posedge i_clk)
@@ -541,11 +576,18 @@ module faxil_master #(
 		else if (f_axi_wr_outstanding > 0)
 			f_axi_wr_ack_delay <= f_axi_wr_ack_delay + 1'b1;
 
-		always @(*)
-			`SLAVE_ASSERT(f_axi_rd_ack_delay < F_AXI_MAXDELAY);
+		initial	f_axi_rd_ack_delay = 0;
+		always @(posedge i_clk)
+		if ((!i_axi_reset_n)||(i_axi_rvalid)||(f_axi_rd_outstanding==0))
+			f_axi_rd_ack_delay <= 0;
+		else
+			f_axi_rd_ack_delay <= f_axi_rd_ack_delay + 1'b1;
 
 		always @(*)
 			`SLAVE_ASSERT(f_axi_wr_ack_delay < F_AXI_MAXDELAY);
+
+		always @(*)
+			`SLAVE_ASSERT(f_axi_rd_ack_delay < F_AXI_MAXDELAY);
 
 	end endgenerate
 
