@@ -1,25 +1,23 @@
 [tasks]
-# prf4x8_lp   nxm opt_lowpower
+prf4x8_lp   nxm opt_lowpower
 prf4x8      nxm
-# cvr4x8_lp   nxl opt_lowpower cvr
-# cvr4x8      nxl              cvr
-# prf1x8_lp   oxm opt_lowpower
-# prf1x8      oxm
-# cvr1x3_lp   oxl opt_lowpower cvr
-# cvr1x3      oxl              cvr
+cvr4x8_lp   nxl opt_lowpower cvr
+cvr4x8      nxl              cvr
+prf1x8_lp   oxm opt_lowpower
+prf1x8      oxm
+cvr1x3_lp   oxl opt_lowpower cvr
+cvr1x3      oxl              cvr
 
-# prf4x1_lp   nxo opt_lowpower
-# prf4x1      nxo
-# cvr4x1_lp   nxo opt_lowpower cvr
-# cvr4x1      nxo              cvr
+prf4x1_lp   nxo opt_lowpower
+prf4x1      nxo
+cvr4x1_lp   nxo opt_lowpower cvr
+cvr4x1      nxo              cvr
 
 [options]
-# ~cvr: mode prove
-# ~cvr: depth 6
-# cvr:  mode cover
-# cvr:  depth 64
-mode prove
-depth 10
+~cvr: mode prove
+~cvr: depth 10
+cvr:  mode cover
+cvr:  depth 64
 
 [engines]
 smtbmc boolector
@@ -33,14 +31,13 @@ read -formal faxi_addr.v
 read -formal faxi_valaddr.v
 read -formal faxi_wstrb.v
 nxm: chparam -set NM 4 -set NS 8 axixbar
-# oxm: chparam -set NM 1 -set NS 8 axixbar
-# oxl: chparam -set NM 1 -set NS 3 axixbar
-# nxl: chparam -set NM 3 -set NS 3 axixbar
-# nxo: chparam -set NM 4 -set NS 1 axixbar
-# opt_lowpower:    chparam -set OPT_LOWPOWER  1 axixbar
-# ~opt_lowpower:   chparam -set OPT_LOWPOWER  0 axixbar
+oxm: chparam -set NM 1 -set NS 8 axixbar
+oxl: chparam -set NM 1 -set NS 3 axixbar
+nxl: chparam -set NM 3 -set NS 3 axixbar
+nxo: chparam -set NM 4 -set NS 1 axixbar
+opt_lowpower:    chparam -set OPT_LOWPOWER  1 axixbar
+~opt_lowpower:   chparam -set OPT_LOWPOWER  0 axixbar
 prep -top axixbar
-dump
 
 [files]
 ../../rtl/axixbar.v

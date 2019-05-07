@@ -321,7 +321,7 @@ module faxi_master #(
 	if ((f_past_valid)&&($past(i_axi_reset_n)))
 	begin
 		// Write address channel
-		if ((f_past_valid)&&($past(i_axi_awvalid))&&(!$past(i_axi_awready)))
+		if ((f_past_valid)&&($past(i_axi_awvalid && !i_axi_awready)))
 		begin
 			`SLAVE_ASSUME(i_axi_awvalid);
 			`SLAVE_ASSUME(i_axi_awaddr  == $past(i_axi_awaddr));
@@ -336,7 +336,7 @@ module faxi_master #(
 		end
 
 		// Write data channel
-		if ((f_past_valid)&&($past(i_axi_wvalid))&&(!$past(i_axi_wready)))
+		if ((f_past_valid)&&($past(i_axi_wvalid && !i_axi_wready)))
 		begin
 			`SLAVE_ASSUME(i_axi_wvalid);
 			`SLAVE_ASSUME($stable(i_axi_wstrb));
@@ -345,7 +345,7 @@ module faxi_master #(
 		end
 
 		// Incoming Read address channel
-		if ((f_past_valid)&&($past(i_axi_arvalid))&&(!$past(i_axi_arready)))
+		if ((f_past_valid)&&($past(i_axi_arvalid && !i_axi_arready)))
 		begin
 			`SLAVE_ASSUME(i_axi_arvalid);
 			`SLAVE_ASSUME($stable(i_axi_arid));
@@ -361,7 +361,7 @@ module faxi_master #(
 
 		// Assume any response from the bus will not change prior to
 		// that response being accepted
-		if ((f_past_valid)&&($past(i_axi_rvalid))&&(!$past(i_axi_rready)))
+		if ((f_past_valid)&&($past(i_axi_rvalid && !i_axi_rready)))
 		begin
 			`SLAVE_ASSERT(i_axi_rvalid);
 			`SLAVE_ASSERT($stable(i_axi_rid));
@@ -370,7 +370,7 @@ module faxi_master #(
 			`SLAVE_ASSERT($stable(i_axi_rlast));
 		end
 
-		if ((f_past_valid)&&($past(i_axi_bvalid))&&(!$past(i_axi_bready)))
+		if ((f_past_valid)&&($past(i_axi_bvalid && !i_axi_bready)))
 		begin
 			`SLAVE_ASSERT(i_axi_bvalid);
 			`SLAVE_ASSERT($stable(i_axi_bid));
@@ -385,19 +385,23 @@ module faxi_master #(
 	//
 	//
 	////////////////////////////////////////////////////////////////////////
-
+	//
 	generate if (F_AXI_MAXWAIT > 0)
 	begin : CHECK_STALL_COUNT
-		//
-		// AXI write address channel
-		//
-		//
 		reg	[(F_LGDEPTH-1):0]	f_axi_awstall,
 						f_axi_wstall,
 						f_axi_arstall;
-						// f_axi_bstall,
-						// f_axi_rstall;
 
+		//
+		// AXI write address channel
+		//
+		// Count the number of times AWVALID is true while AWREADY
+		// is false.  These are stalls, and we want to insist on a
+		// minimum number of them.  However, if BVALID && !BREADY,
+		// then there's a reason for not accepting anything more.
+		// Similarly, many cores will only ever accept one request
+		// at a time, hence we won't count things as stalls if
+		// WR-PENDING > 0.
 		initial	f_axi_awstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_awvalid)||(i_axi_awready)
@@ -412,10 +416,10 @@ module faxi_master #(
 		//
 		// AXI write data channel
 		//
-		//
-		// AXI explicitly allows write bursts with zero strobes.  This
-		// is part of how a transaction is aborted (if at all).
-
+		// Count the number of clock cycles that the write data
+		// channel is stalled, that is while WVALID && !WREADY.
+		// Since things can back up if BVALID & !BREADY, we avoid
+		// counting clock cycles in that circumstance
 		initial	f_axi_wstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_wvalid)||(i_axi_wready)
@@ -430,13 +434,18 @@ module faxi_master #(
 		//
 		// AXI read address channel
 		//
-		//
+		// Similar to the first two above, once the master raises
+		// ARVALID, insist that the slave respond within a minimum
+		// number of clock cycles.  Exceptions include any time
+		// RVALID is true, since that can back up the whole system,
+		// and any time the number of bursts is greater than zero,
+		// since many slaves can only accept one request at a time.
 		initial	f_axi_arstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_arvalid)||(i_axi_arready)
 				||(i_axi_rvalid)||(f_axi_rd_nbursts > 0))
 			f_axi_arstall <= 0;
-		else if ((!i_axi_rvalid)||(i_axi_rready))
+		else
 			f_axi_arstall <= f_axi_arstall + 1'b1;
 
 		always @(*)
@@ -468,7 +477,12 @@ module faxi_master #(
 						f_axi_rstall;
 
 		// AXI write channel valid
-		initial	f_axi_bstall = 0;
+		//
+		// The first master stall check: guarantee that the master
+		// provides the required write data in fairly short order,
+		// and without much delay.  That is, once AWVALID && AWREADY
+		// are true, the slave needs to provide the W* values
+		initial	f_axi_wvstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(i_axi_wvalid)
 				||(i_axi_bvalid && !i_axi_bready)
@@ -481,6 +495,9 @@ module faxi_master #(
 			`SLAVE_ASSUME(f_axi_wvstall < F_AXI_MAXRSTALL);
 
 		// AXI write response channel
+		//
+		// Insist on a maximum number of clocks that BVALID can be
+		// high while BREADY is low
 		initial	f_axi_bstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_bvalid)||(i_axi_bready))
@@ -492,6 +509,9 @@ module faxi_master #(
 			`SLAVE_ASSUME(f_axi_bstall < F_AXI_MAXRSTALL);
 
 		// AXI read response channel
+		//
+		// Insist on a maximum number of clocks that RVALID can be
+		// high while RREADY is low
 		initial	f_axi_rstall = 0;
 		always @(posedge i_clk)
 		if ((!i_axi_reset_n)||(!i_axi_rvalid)||(i_axi_rready))
@@ -749,6 +769,14 @@ module faxi_master #(
 		begin
 			`SLAVE_ASSERT(f_axi_rdid_nbursts > 0);
 			`SLAVE_ASSERT(f_axi_rdid_outstanding > 0);
+			if (f_axi_rd_ckvalid)
+			begin
+				if (f_axi_rdid_ckign_nbursts > 0)
+				begin
+					`SLAVE_ASSERT((f_axi_rdid_ckign_nbursts != 1)
+						||(i_axi_rlast == (f_axi_rdid_ckign_outstanding)));
+				end
+			end
 		end else begin
 			`SLAVE_ASSERT(f_axi_rd_nbursts > f_axi_rdid_nbursts);
 			`SLAVE_ASSERT(f_axi_rd_outstanding
@@ -756,33 +784,98 @@ module faxi_master #(
 		end
 	end
 
-	always @(posedge i_clk)
-		assume(f_axi_rd_outstanding <= { f_axi_rd_nbursts[F_LGDEPTH-9:0], 8'h0 });
-	always @(*)
-	if (i_axi_rvalid)
-	begin
-		if (f_axi_rd_outstanding == f_axi_rd_nbursts)
-			`SLAVE_ASSERT(i_axi_rlast);
-	
-		if (f_axi_rd_nbursts == 1)
-			`SLAVE_ASSERT(i_axi_rlast == (f_axi_rd_outstanding==1));
-			
+	reg	[F_LGDEPTH-1:0]	next_rd_nbursts,
+				next_rdid_nbursts,
+				next_rdno_nbursts,
+				next_rdign_nbursts;
+	reg	[F_LGDEPTH-1:0]	next_rd_outstanding,
+				next_rdid_outstanding,
+				next_rdno_outstanding,
+				next_rdign_outstanding;
 
-		if (f_axi_rd_checkid == i_axi_rid)
-		begin
-			if (f_axi_rdid_outstanding == f_axi_rdid_nbursts)
-				`SLAVE_ASSERT(i_axi_rlast);
-			if (f_axi_rdid_nbursts == 1)
-				`SLAVE_ASSERT(i_axi_rlast == (f_axi_rdid_outstanding == 1));
-		end else // if (f_axi_rd_checkid != i_axi_rid
-		begin
-			if ((f_axi_rd_outstanding - f_axi_rdid_outstanding)
-				 == (f_axi_rd_nbursts - f_axi_rdid_nbursts))
-				`SLAVE_ASSERT(i_axi_rlast);
-			if (f_axi_rd_nbursts - f_axi_rdid_nbursts == 1)
-				`SLAVE_ASSERT(i_axi_rlast == (f_axi_rd_outstanding - f_axi_rdid_outstanding == 1));
-		end
+	always @(*)
+		next_rd_nbursts = f_axi_rd_nbursts
+				- (i_axi_rvalid && i_axi_rlast ? 1:0);
+
+	always @(*)
+		next_rd_outstanding = f_axi_rd_outstanding
+				- (i_axi_rvalid ? 1:00);
+
+	always @(*)
+		next_rdid_nbursts = f_axi_rdid_nbursts
+			-((i_axi_rvalid && i_axi_rlast
+				&&(i_axi_rid == f_axi_rd_checkid)) ? 1:0);
+
+	always @(*)
+		next_rdid_outstanding = f_axi_rdid_outstanding
+		    - ((i_axi_rvalid && i_axi_rid == f_axi_rd_checkid) ? 1:0);
+
+	always @(*)
+		next_rdno_nbursts = f_axi_rd_nbursts - f_axi_rdid_nbursts
+			-((i_axi_rvalid && i_axi_rlast
+				&&(i_axi_rid != f_axi_rd_checkid)) ? 1:0);
+
+	always @(*)
+		next_rdno_outstanding = f_axi_rd_outstanding - f_axi_rdid_outstanding
+		    - ((i_axi_rvalid && i_axi_rid != f_axi_rd_checkid) ? 1:0);
+
+	always @(*)
+	begin
+		next_rdign_nbursts = 0;
+		if (f_axi_rd_ckvalid && next_rdign_nbursts > 0)
+			next_rdign_nbursts = f_axi_rdid_ckign_nbursts
+				-((i_axi_rvalid && i_axi_rlast
+					&&(i_axi_rid == f_axi_rd_checkid)) ? 1:0);
 	end
+
+	always @(*)
+	begin
+		next_rdign_outstanding = 0;
+		if (f_axi_rd_ckvalid && next_rdign_outstanding > 0)
+			next_rdign_outstanding = f_axi_rdid_ckign_outstanding
+				-((i_axi_rvalid
+					&&(i_axi_rid == f_axi_rd_checkid)) ? 1:0);
+	end
+
+	always @(*)
+		`SLAVE_ASSERT(next_rd_nbursts   <= next_rd_outstanding);
+	always @(*)
+		`SLAVE_ASSERT(next_rdid_nbursts <= next_rdid_outstanding);
+	always @(*)
+		`SLAVE_ASSERT(next_rdno_nbursts <= next_rdno_outstanding);
+	always @(*)
+	if (next_rdign_nbursts > 0)
+	begin
+		`SLAVE_ASSERT(next_rdid_nbursts >= next_rdign_nbursts + 1);
+		`SLAVE_ASSERT(next_rdid_nbursts <= next_rdid_outstanding - next_rdign_outstanding - f_axi_rd_cklen);
+		`SLAVE_ASSERT(next_rdid_outstanding >= next_rdign_outstanding + f_axi_rd_cklen);
+	end else if (f_axi_rd_cklen > 0)
+	begin
+		`SLAVE_ASSERT(next_rdid_nbursts >= 1);
+		`SLAVE_ASSERT(next_rdid_outstanding >= f_axi_rd_cklen + f_axi_rdid_nbursts - 1);
+	end
+
+	always @(*)
+		`SLAVE_ASSERT({ 8'h00, next_rd_outstanding }
+				<= { next_rd_nbursts, 8'h00 });
+	always @(*)
+		`SLAVE_ASSERT({ 8'h00, next_rdid_outstanding }
+				<= { next_rdid_nbursts, 8'h00 });
+	always @(*)
+		`SLAVE_ASSERT({ 8'h00, next_rdno_outstanding }
+				<= { next_rdno_nbursts, 8'h00 });
+
+	always @(*)
+	if (f_axi_rd_ckvalid && f_axi_rdid_ckign_nbursts > 0)
+	begin
+		if (!i_axi_rvalid || !i_axi_rlast)
+			`SLAVE_ASSERT(next_rdid_nbursts <= f_axi_rdid_ckign_nbursts + 1);
+		if (!i_axi_rvalid)
+			`SLAVE_ASSERT(next_rdid_outstanding <= f_axi_rdid_ckign_outstanding + f_axi_rd_cklen);
+	end
+
+	always @(posedge i_clk)
+		assert({ 8'h00, f_axi_rd_outstanding } <= { f_axi_rd_nbursts, 8'h0 });
 
 	always @(*)
 	if (i_axi_rvalid && f_axi_rd_ckvalid && f_axi_rd_checkid == i_axi_rid)
@@ -790,6 +883,7 @@ module faxi_master #(
 
 		if (f_axi_rdid_ckign_nbursts > 0)
 		begin
+			`SLAVE_ASSERT(next_rdid_nbursts >= f_axi_rdid_ckign_nbursts);
 			if (f_axi_rdid_ckign_outstanding == f_axi_rdid_nbursts)
 				`SLAVE_ASSERT(i_axi_rlast);
 		end else
@@ -922,6 +1016,7 @@ module faxi_master #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
+	initial	f_axi_wr_len = 0;
 	always @(posedge i_clk)
 	begin
 		if (axi_awr_req)
@@ -1087,7 +1182,7 @@ module faxi_master #(
 			1'b1, ard_aligned, valid_iraddr);
 
 	always @(*)
-	if (i_axi_arvalid > 0)
+	if (i_axi_arvalid)
 		`SLAVE_ASSUME(valid_iraddr);
 
 
@@ -1253,6 +1348,12 @@ module faxi_master #(
 			`SLAVE_ASSUME(i_axi_wlast);
 
 		always @(posedge i_clk)
+			assert(f_axi_wr_pending <= 1);
+
+		always @(posedge i_clk)
+			assert(f_axi_wr_len == 0);
+
+		always @(posedge i_clk)
 		if (i_axi_arvalid)
 			`SLAVE_ASSUME(i_axi_arlen == 0);
 
@@ -1262,6 +1363,11 @@ module faxi_master #(
 
 		always @(*)
 			`SLAVE_ASSERT(f_axi_rd_nbursts == f_axi_rd_outstanding);
+		always @(*)
+			`SLAVE_ASSERT(f_axi_rdid_nbursts==f_axi_rdid_outstanding);
+		always @(*)
+		if (f_axi_rd_ckvalid)
+			`SLAVE_ASSERT(f_axi_rdid_ckign_nbursts==f_axi_rdid_ckign_outstanding);
 	end endgenerate
 
 

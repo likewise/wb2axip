@@ -316,8 +316,12 @@ module	axixbar #(
 	reg	[4-1:0]				r_arcache	[0:NMFULL-1];
 	reg	[2:0]				r_arprot	[0:NMFULL-1];
 	reg	[3:0]				r_arqos		[0:NMFULL-1];
-		//
 	//
+	//
+	reg	[NM-1:0]			rerr_none;
+	reg	[NM-1:0]			rerr_last;
+	reg	[8:0]				rerr_outstanding [0:NM-1];
+	reg	[IW-1:0]			rerr_id		 [0:NM-1];
 
 	// The shadow buffers
 	reg	[NMFULL-1:0]	m_awvalid, m_wvalid, m_arvalid;
@@ -462,7 +466,7 @@ module	axixbar #(
 				slave_awaccepts[N] = 1'b0;
 			if (!wrequest[N][mwindex[N]])
 				slave_awaccepts[N] = 1'b0;
-			if (mwindex[N] != NS)
+			if (!wgrant[N][NS])
 			begin
 				if ((s_axi_awvalid[mwindex[N]] && !s_axi_awready[mwindex[N]]))
 					slave_awaccepts[N] = 1'b0;
@@ -488,12 +492,10 @@ module	axixbar #(
 			//	slave_waccepts[N] = 1'b0;
 			if (!wdata_expected[N])
 				slave_waccepts[N] = 1'b0;
-			if ((mwindex[N] != NS)
-					&&(s_axi_wvalid[mwindex[N]]
+			if (!wgrant[N][NS] &&(s_axi_wvalid[mwindex[N]]
 						&& !s_axi_wready[mwindex[N]]))
 				slave_waccepts[N] = 1'b0;
-			if ((mwindex[N] == NS)
-					&&(M_AXI_BVALID[N] && !M_AXI_BREADY[N]))
+			if (wgrant[N][NS]&&(M_AXI_BVALID[N]&& !M_AXI_BREADY[N]))
 				slave_waccepts[N] = 1'b0;
 		end
 
@@ -655,9 +657,9 @@ module	axixbar #(
 			if (!rrequest[N][mrindex[N]])
 				slave_raccepts[N] = 1'b0;
 			// verilator lint_on  WIDTH
-			if ((mrindex[N] != NS)&&(s_axi_arvalid[mrindex[N]] && !s_axi_arready[mrindex[N]]))
+			if (!rgrant[N][NS]&&(s_axi_arvalid[mrindex[N]] && !s_axi_arready[mrindex[N]]))
 				slave_raccepts[N] = 1'b0;
-			if ((mrindex[N] == NS)&&(M_AXI_RVALID[N] && !M_AXI_RREADY[N]))
+			if (rgrant[N][NS]&& (!mrempty[N] || !rerr_none[N]))
 				slave_raccepts[N] = 1'b0;
 		end
 
@@ -939,6 +941,8 @@ module	axixbar #(
 				if (rrequest[N][iM] && rgrant[N][iM])
 					stay_on_channel = 1;
 			end
+			if (rgrant[N][NS] && !rerr_none[N])
+				stay_on_channel = 1;
 		end
 
 		reg	requested_channel_is_available;
@@ -1010,6 +1014,10 @@ module	axixbar #(
 				leave_channel = 0;
 			if (!mrgrant[N])
 				// Can't leave a channel we aren't a part of
+				leave_channel = 0;
+			if (!rerr_none[N])
+				// Can't leave the error channel if more
+				// returns are required
 				leave_channel = 0;
 		end
 
@@ -1203,6 +1211,34 @@ module	axixbar #(
 
 		always @(*)
 			assert(!M_AXI_ARREADY[N] == r_arvalid[N]);
+
+		always @(*)
+		if (OPT_LOWPOWER && !r_awvalid[N])
+		begin
+			assert(r_awid[N]    == 0);
+			assert(r_awaddr[N]  == 0);
+			assert(r_awlen[N]   == 0);
+			assert(r_awsize[N]  == 0);
+			assert(r_awburst[N] == 0);
+			assert(r_awlock[N]  == 0);
+			assert(r_awcache[N] == 0);
+			assert(r_awprot[N]  == 0);
+			assert(r_awqos[N]   == 0);
+		end
+
+		always @(*)
+		if (OPT_LOWPOWER && !r_arvalid[N])
+		begin
+			assert(r_arid[N]    == 0);
+			assert(r_araddr[N]  == 0);
+			assert(r_arlen[N]   == 0);
+			assert(r_arsize[N]  == 0);
+			assert(r_arburst[N] == 0);
+			assert(r_arlock[N]  == 0);
+			assert(r_arcache[N] == 0);
+			assert(r_arprot[N]  == 0);
+			assert(r_arqos[N]   == 0);
+		end
 `endif
 	end endgenerate
 
@@ -1268,7 +1304,7 @@ module	axixbar #(
 	begin
 
 		always @(*)
-			swindex[M] = 0;
+			srindex[M] = 0;
 
 	end endgenerate
 
@@ -1303,14 +1339,28 @@ module	axixbar #(
 		always @(*)
 			mbstall = (M_AXI_BVALID[swindex[M]] && !M_AXI_BREADY[swindex[M]]);
 
+		reg	awaccepts;
+		always @(*)
+		begin
+			awaccepts = 1'b1;
+			if (!swgrant[M])
+				awaccepts = 1'b0;
+			if (mwnearfull[swindex[M]])
+				awaccepts = 1'b0;
+			if (!wrequest[swindex[M]][M])
+				awaccepts = 1'b0;
+			if ((s_axi_wvalid[M] && !s_axi_wready[M]))
+				awaccepts = 1'b0;
+		end
+
+
 		initial	axi_awvalid = 0;
 		always @(posedge  S_AXI_ACLK)
 		if (!S_AXI_ARESETN || !swgrant[M])
 			axi_awvalid <= 0;
 		else if (!sawstall)
 		begin
-			axi_awvalid <= m_awvalid[swindex[M]]
-				&&(slave_awaccepts[swindex[M]]);
+			axi_awvalid <= m_awvalid[swindex[M]] &&(awaccepts);
 		end
 
 		initial	axi_awid    = 0;
@@ -1347,7 +1397,7 @@ module	axixbar #(
 			axi_awqos   <= 0;
 		end else if (!sawstall)
 		begin
-			if (!OPT_LOWPOWER||(m_awvalid[swindex[M]]&&slave_awaccepts[swindex[M]]))
+			if (!OPT_LOWPOWER||(m_awvalid[swindex[M]]&&awaccepts))
 			begin
 				if (NM == 1)
 				begin
@@ -1466,8 +1516,15 @@ module	axixbar #(
 			always @(*)
 			if (!axi_awvalid)
 			begin
-				assert(axi_awaddr == 0);
-				assert(axi_awprot == 0);
+				assert(axi_awid    == 0);
+				assert(axi_awaddr  == 0);
+				assert(axi_awlen   == 0);
+				assert(axi_awsize  == 0);
+				assert(axi_awburst == 0);
+				assert(axi_awlock  == 0);
+				assert(axi_awcache == 0);
+				assert(axi_awprot  == 0);
+				assert(axi_awqos   == 0);
 			end
 
 			always @(*)
@@ -1475,6 +1532,7 @@ module	axixbar #(
 			begin
 				assert(axi_wdata == 0);
 				assert(axi_wstrb == 0);
+				assert(axi_wlast == 0);
 			end
 		end
 `endif
@@ -1613,8 +1671,15 @@ module	axixbar #(
 			always @(*)
 			if (!axi_arvalid)
 			begin
-				assert(axi_araddr == 0);
-				assert(axi_arprot == 0);
+				assert(axi_arid    == 0);
+				assert(axi_araddr  == 0);
+				assert(axi_arlen   == 0);
+				assert(axi_arsize  == 0);
+				assert(axi_arburst == 0);
+				assert(axi_arlock  == 0);
+				assert(axi_arcache == 0);
+				assert(axi_arprot  == 0);
+				assert(axi_arqos   == 0);
 			end
 		end
 `endif
@@ -1637,13 +1702,14 @@ module	axixbar #(
 		reg	[IW-1:0] i_axi_bid;
 
 		always @(*)
-		if (mwindex[N] == NS)
-			i_axi_bvalid = m_wvalid[N] && slave_waccepts[N] && m_wlast[N];
+		if (wgrant[N][NS])
+			i_axi_bvalid = m_wvalid[N] && (!M_AXI_BVALID[N]||M_AXI_BREADY[N]) && m_wlast[N] && wdata_expected[N];
+//			i_axi_bvalid = m_wvalid[N] && slave_waccepts[N] && m_wlast[N];
 		else
 			i_axi_bvalid = s_axi_bvalid[mwindex[N]];
 
 		always @(*)
-		if (mwindex[N] == NS)
+		if (wgrant[N][NS])
 			i_axi_bid = m_wid[N];
 		else
 			i_axi_bid = s_axi_bid[mwindex[N]];
@@ -1695,8 +1761,8 @@ module	axixbar #(
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
 			r_bvalid[N] <= 0;
-		else if (mbstall && !r_bvalid[N] && (mwindex[N] != NS))
-			r_bvalid[N] <= mwgrant[N] && (mwindex[N]<NS)&&i_axi_bvalid;
+		else if (mbstall && !r_bvalid[N] && !wgrant[N][NS])
+			r_bvalid[N] <= mwgrant[N] && i_axi_bvalid;
 		else if (!mbstall)
 			r_bvalid[N] <= 1'b0;
 
@@ -1713,7 +1779,7 @@ module	axixbar #(
 			r_bresp[N] <= 0;
 		end else if (!r_bvalid[N])
 		begin
-			if (!OPT_LOWPOWER ||(i_axi_bvalid && (mwindex[N] < NS) && mbstall))
+			if (!OPT_LOWPOWER ||(i_axi_bvalid && !wgrant[N][NS] && mbstall))
 			begin
 				if (NS==1)
 				begin
@@ -1773,7 +1839,7 @@ module	axixbar #(
 			else
 				axi_bresp <= 0;
 
-			if (mwindex[N] == NS && (!OPT_LOWPOWER || i_axi_bvalid))
+			if (wgrant[N][NS] && (!OPT_LOWPOWER || i_axi_bvalid))
 				axi_bresp <= INTERCONNECT_ERROR;
 		end
 
@@ -1848,8 +1914,8 @@ module	axixbar #(
 		reg	mrstall;
 		reg	i_axi_rvalid;
 		always @(*)
-		if (mrindex[N] == NS)
-			i_axi_rvalid = m_arvalid[N] && slave_raccepts[N];
+		if (rgrant[N][NS])
+			i_axi_rvalid = !rerr_none[N] && slave_raccepts[N];
 		else
 			i_axi_rvalid = s_axi_rvalid[mrindex[N]];
 
@@ -1876,7 +1942,7 @@ module	axixbar #(
 		if (!S_AXI_ARESETN)
 			r_rvalid[N] <= 0;
 		else if (mrstall && !r_rvalid[N])
-			r_rvalid[N] <= mrgrant[N] && (mrindex[N]<NS)&&i_axi_rvalid;
+			r_rvalid[N] <= mrgrant[N] && !rgrant[N][NS]&&i_axi_rvalid;
 		else if (!mrstall)
 			r_rvalid[N] <= 0;
 
@@ -1899,7 +1965,7 @@ module	axixbar #(
 			r_rlast[N] <= 0;
 		end else if (!r_rvalid[N])
 		begin
-			if (!OPT_LOWPOWER || (i_axi_rvalid && (mrindex[N] < NS)&& mrstall))
+			if (!OPT_LOWPOWER || (i_axi_rvalid && !rgrant[N][NS] && mrstall))
 			begin
 				if (NS == 1)
 				begin
@@ -1926,7 +1992,11 @@ module	axixbar #(
 		if (!S_AXI_ARESETN)
 			axi_rvalid <= 0;
 		else if (!mrstall)
+		begin
 			axi_rvalid <= mrgrant[N] && (r_rvalid[N] || i_axi_rvalid);
+			if (rgrant[N][NS])
+				axi_rvalid <= !rerr_none[N];
+		end
 
 		initial	axi_rid  = 0;
 		initial	axi_rresp = 0;
@@ -1968,7 +2038,7 @@ module	axixbar #(
 					axi_rlast <= s_axi_rlast[mrindex[N]];
 				end
 
-				if (mrindex[N] >= NS)
+				if (rgrant[N][NS])
 					axi_rresp <= INTERCONNECT_ERROR;
 			end else begin
 				axi_rid   <= 0;
@@ -1976,9 +2046,18 @@ module	axixbar #(
 				axi_rdata <= 0;
 				axi_rlast <= 0;
 			end
+
+			if (rgrant[N][NS])
+			begin
+				if (!OPT_LOWPOWER || !rerr_none[N])
+					axi_rid   <= rerr_id[N];
+				else
+					axi_rid   <= 0;
+				axi_rlast <= rerr_last[N];
+			end
 		end
 
-		assign	M_AXI_ARREADY[N]       = axi_arready && !r_arvalid[N];
+		assign	M_AXI_ARREADY[N]       = axi_arready;
 		//
 		assign	M_AXI_RVALID[N]        = axi_rvalid;
 		assign	M_AXI_RID[  N*IW +: IW]= axi_rid;
@@ -1987,7 +2066,7 @@ module	axixbar #(
 		assign	M_AXI_RLAST[N]         = axi_rlast;
 `ifdef	FORMAL
 		always @(*)
-		if (mrgrant[N] && (mrindex[N] < NS))
+		if (mrgrant[N] && !rgrant[N][NS])
 			assert(s_axi_rready[mrindex[N]] == !r_rvalid[N]);
 		else
 			assert(!r_rvalid[N]);
@@ -2050,14 +2129,26 @@ module	axixbar #(
 		endcase
 
 		initial	wpending = 0;
+		initial	r_wdata_expected = 0;
 		always @(posedge S_AXI_ACLK)
 		if (!S_AXI_ARESETN)
+		begin
 			wpending <= 0;
-		else case ({(m_awvalid[N] && slave_awaccepts[N]),
+			r_wdata_expected <= 0;
+		end else case ({(m_awvalid[N] && slave_awaccepts[N]),
 				(m_wvalid[N] && slave_waccepts[N])})
-		2'b01: wpending <= wpending - 1;
-		2'b10: wpending <= wpending + (m_awlen[N]+1);
-		2'b11: wpending <= wpending + (m_awlen[N]);
+		2'b01: begin
+			wpending <= wpending - 1;
+			r_wdata_expected <= (wpending != 1);
+			end
+		2'b10: begin
+			wpending <= wpending + (m_awlen[N]+1);
+			r_wdata_expected <= (wpending != 1);
+			end
+		2'b11: begin
+			wpending <= wpending + (m_awlen[N]);
+			r_wdata_expected <= (m_awlen[N] != 0);
+			end
 		default: begin end
 		endcase
 
@@ -2065,10 +2156,10 @@ module	axixbar #(
 	always @(*)
 	if (m_wvalid[N] && slave_waccepts[N])
 		assert(m_wlast[N] == (wpending == 1));
+	always @(*)
+		assert(r_wdata_expected == (wpending > 0));
 `endif
 
-		always @(*)
-			r_wdata_expected = (wpending > 0);
 
 
 		initial	rpending     = 0;
@@ -2082,9 +2173,9 @@ module	axixbar #(
 			mrempty[N]<= 1;
 			mrfull[N] <= 0;
 			mrnearfull[N] <= 0;
-		end else case ({(m_arvalid[N] && slave_raccepts[N]),
+		end else case ({(m_arvalid[N] && slave_raccepts[N] && !rgrant[N][NS]),
 				(M_AXI_RVALID[N] && M_AXI_RREADY[N]
-					&& M_AXI_RLAST[N])})
+					&& M_AXI_RLAST[N] && !rgrant[N][NS])})
 		2'b01: begin
 			rpending      <= rpending - 1;
 			mrempty[N]    <= (rpending == 1);
@@ -2108,10 +2199,58 @@ module	axixbar #(
 		always @(*)
 			wdata_expected[N] = r_wdata_expected;
 
+
+		initial	rerr_outstanding[N] = 0;
+		initial	rerr_last[N] = 0;
+		initial	rerr_none[N] = 1;
+		always @(posedge S_AXI_ACLK)
+		if (!S_AXI_ARESETN)
+		begin
+			rerr_outstanding[N] <= 0;
+			rerr_last[N] <= 0;
+			rerr_none[N] <= 1;
+		end else if (!rerr_none[N])
+		begin
+			if (!M_AXI_RVALID[N] || M_AXI_RREADY[N])
+			begin
+				rerr_none[N] <= (rerr_outstanding[N] == 1);
+				rerr_last[N] <= (rerr_outstanding[N] == 2);
+				rerr_outstanding[N] <= rerr_outstanding[N] - 1;
+			end
+		end else if (m_arvalid[N] && rrequest[N][NS]
+						&& slave_raccepts[N])
+		begin
+			rerr_none[N] <= 0;
+			rerr_last[N] <= (m_arlen[N] == 0);
+			rerr_outstanding[N] <= m_arlen[N] + 1;
+		end
+
+		initial	rerr_id[N] = 0;
+		always @(posedge S_AXI_ACLK)
+		if (m_arvalid[N] && rrequest[N][NS] && slave_raccepts[N])
+		begin
+			if (rrequest[N][NS] || !OPT_LOWPOWER)
+				rerr_id[N] <= m_arid[N];
+			else
+				rerr_id[N] <= 0;
+		end
+
+`ifdef	FORMAL
+		always @(*)
+			assert(rerr_none[N] ==  (rerr_outstanding[N] == 0));
+		always @(*)
+			assert(rerr_last[N] ==  (rerr_outstanding[N] == 1));
+		always @(*)
+		if (OPT_LOWPOWER && rerr_none[N])
+			assert(rerr_id[N] ==  0);
+`endif
 	end endgenerate
 
 `ifdef	FORMAL
 	localparam	F_LGDEPTH = LGMAXBURST+9;
+	localparam [0:0]	OPT_READS  = 1;
+	localparam [0:0]	OPT_WRITES = 0;
+
 
 	//
 	//
@@ -2396,7 +2535,7 @@ module	axixbar #(
 			unwr_bursts[N] = 0;
 			if (r_awvalid[N])
 				unwr_bursts[N] = unwr_bursts[N] + 1;
-			if (mwgrant[N] && (mwindex[N]<NS) && s_axi_awvalid[mwindex[N]])
+			if (mwgrant[N] && !wgrant[N][NS] && s_axi_awvalid[mwindex[N]])
 				unwr_bursts[N] = unwr_bursts[N] + 1;
 			if (r_bvalid[N])
 				unwr_bursts[N] = unwr_bursts[N] + 1;
@@ -2407,10 +2546,10 @@ module	axixbar #(
 		always @(*)
 		begin
 			unwr_data[N] = 0;
-			if (mwgrant[N] && (mwindex[N]<NS) && s_axi_wvalid[mwindex[N]])
+			if (mwgrant[N] && !wgrant[N][NS] && s_axi_wvalid[mwindex[N]])
 				unwr_data[N] = unwr_data[N] + 1;
-			if (!mwgrant[N] || (mwindex[N]==NS)
-				|| !s_axi_wvalid[mwindex[N]] || !S_AXI_WLAST[N])
+			if (!mwgrant[N] || wgrant[N][NS]
+				|| !s_axi_wvalid[mwindex[N]] || !S_AXI_WLAST[mwindex[N]])
 			begin
 				if (r_wvalid[N])
 					unwr_data[N] = unwr_data[N] + 1;
@@ -2422,7 +2561,7 @@ module	axixbar #(
 			unwrid_bursts[N] = 0;
 			if (r_awvalid[N] && r_awid[N] == fm_wr_checkid[N])
 				unwrid_bursts[N] = unwrid_bursts[N] + 1;
-			if (mwgrant[N] && (mwindex[N]<NS) && s_axi_awvalid[mwindex[N]]
+			if (mwgrant[N] && !wgrant[N][NS] && s_axi_awvalid[mwindex[N]]
 					&& s_axi_awid[mwindex[N]] == fm_wr_checkid[N])
 				unwrid_bursts[N] = unwrid_bursts[N] + 1;
 			if (r_bvalid[N] && r_bid[N] == fm_wr_checkid[N])
@@ -2436,7 +2575,7 @@ module	axixbar #(
 			unwrno_bursts[N] = 0;
 			if (r_awvalid[N] && r_awid[N] != fm_wr_checkid[N])
 				unwrno_bursts[N] = unwrno_bursts[N] + 1;
-			if (mwgrant[N] && (mwindex[N]<NS) && s_axi_awvalid[mwindex[N]]
+			if (mwgrant[N] && !wgrant[N][NS] && s_axi_awvalid[mwindex[N]]
 					&& s_axi_awid[mwindex[N]] != fm_wr_checkid[N])
 				unwrno_bursts[N] = unwrno_bursts[N] + 1;
 			if (r_bvalid[N] && r_bid[N] != fm_wr_checkid[N])
@@ -2491,9 +2630,11 @@ module	axixbar #(
 			unrd_bursts[N] = 0;
 			if (r_arvalid[N])
 				unrd_bursts[N] = unrd_bursts[N] + 1;
-			if (mrgrant[N] && (mrindex[N]<NS) && s_axi_arvalid[mrindex[N]])
+			if (mrgrant[N] && !rgrant[N][NS] && s_axi_arvalid[mrindex[N]])
 				unrd_bursts[N] = unrd_bursts[N] + 1;
 			if (r_rvalid[N] && r_rlast[N])
+				unrd_bursts[N] = unrd_bursts[N] + 1;
+			if (!rerr_none[N])
 				unrd_bursts[N] = unrd_bursts[N] + 1;
 			if (M_AXI_RVALID[N] && M_AXI_RLAST[N])
 				unrd_bursts[N] = unrd_bursts[N] + 1;
@@ -2504,10 +2645,12 @@ module	axixbar #(
 			unrd_outstanding[N] = 0;
 			if (r_arvalid[N])
 				unrd_outstanding[N] = unrd_outstanding[N] + r_arlen[N]+1;
-			if (mrgrant[N] && (mrindex[N]<NS) && s_axi_arvalid[mrindex[N]])
-				unrd_outstanding[N] = unrd_outstanding[N] + s_axi_arlen[N]+1;
+			if (mrgrant[N] && !rgrant[N][NS] && s_axi_arvalid[mrindex[N]])
+				unrd_outstanding[N] = unrd_outstanding[N] + s_axi_arlen[mrindex[N]]+1;
 			if (r_rvalid[N])
 				unrd_outstanding[N] = unrd_outstanding[N] + 1;
+			if (!rerr_none[N])
+				unrd_outstanding[N] = unrd_outstanding[N] + rerr_outstanding[N];
 			if (M_AXI_RVALID[N])
 				unrd_outstanding[N] = unrd_outstanding[N] + 1;
 		end
@@ -2521,10 +2664,12 @@ module	axixbar #(
 			unrdid_bursts[N] = 0;
 			if (r_arvalid[N]&& (r_arid[N]==fm_rd_checkid[N]))
 				unrdid_bursts[N] = unrdid_bursts[N] + 1;
-			if (mrgrant[N] && (mrindex[N]<NS) && s_axi_arvalid[mrindex[N]] && s_axi_arid[mrindex[N]] == fm_rd_checkid[N])
+			if (mrgrant[N] && !rgrant[N][NS] && s_axi_arvalid[mrindex[N]] && s_axi_arid[mrindex[N]] == fm_rd_checkid[N])
 				unrdid_bursts[N] = unrdid_bursts[N] + 1;
 			if (r_rvalid[N] && (r_rid[N] == fm_rd_checkid[N])
 					&& r_rlast[N])
+				unrdid_bursts[N] = unrdid_bursts[N] + 1;
+			if (!rerr_none[N] && rerr_id[N] == fm_rd_checkid[N])
 				unrdid_bursts[N] = unrdid_bursts[N] + 1;
 			if (M_AXI_RVALID[N] && M_AXI_RLAST[N]
 				&&(M_AXI_RID[N*IW+:IW] == fm_rd_checkid[N]))
@@ -2536,10 +2681,12 @@ module	axixbar #(
 			unrdid_outstanding[N] = 0;
 			if (r_arvalid[N]&&(r_arid[N]==fm_rd_checkid[N]))
 				unrdid_outstanding[N] = r_arlen[N]+1;
-			if (mrgrant[N] && (mrindex[N]<NS) && s_axi_arvalid[mrindex[N]] && s_axi_arid[mrindex[N]] == fm_rd_checkid[N])
-				unrdid_outstanding[N] = unrdid_outstanding[N]+s_axi_arlen[N]+1;
+			if (mrgrant[N] && !rgrant[N][NS] && s_axi_arvalid[mrindex[N]] && s_axi_arid[mrindex[N]] == fm_rd_checkid[N])
+				unrdid_outstanding[N] = unrdid_outstanding[N]+s_axi_arlen[mrindex[N]]+1;
 			if (r_rvalid[N] && (r_rid[N] == fm_rd_checkid[N]))
 				unrdid_outstanding[N] = unrdid_outstanding[N] + 1;
+			if (!rerr_none[N] && rerr_id[N] == fm_rd_checkid[N])
+				unrdid_outstanding[N] = unrdid_outstanding[N] + rerr_outstanding[N];
 			if (M_AXI_RVALID[N]
 				&&(M_AXI_RID[N*IW+:IW] == fm_rd_checkid[N]))
 				unrdid_outstanding[N] = unrdid_outstanding[N] + 1;
@@ -2554,10 +2701,14 @@ module	axixbar #(
 			unrdno_bursts[N] = 0;
 			if (r_arvalid[N]&& (r_arid[N]!=fm_rd_checkid[N]))
 				unrdno_bursts[N] = unrdno_bursts[N] + 1;
-			if (mrgrant[N] && (mrindex[N]<NS) && s_axi_arvalid[mrindex[N]] && s_axi_arid[mrindex[N]] != fm_rd_checkid[N])
+			if (mrgrant[N] && !rgrant[N][NS]
+				&& s_axi_arvalid[mrindex[N]]
+				&& s_axi_arid[mrindex[N]] != fm_rd_checkid[N])
 				unrdno_bursts[N] = unrdno_bursts[N] + 1;
 			if (r_rvalid[N] && (r_rid[N] != fm_rd_checkid[N])
 					&& r_rlast[N])
+				unrdno_bursts[N] = unrdno_bursts[N] + 1;
+			if (!rerr_none[N] && rerr_id[N] != fm_rd_checkid[N])
 				unrdno_bursts[N] = unrdno_bursts[N] + 1;
 			if (M_AXI_RVALID[N] && M_AXI_RLAST[N]
 				&&(M_AXI_RID[N*IW+:IW] != fm_rd_checkid[N]))
@@ -2569,10 +2720,13 @@ module	axixbar #(
 			unrdno_outstanding[N] = 0;
 			if (r_arvalid[N]&&(r_arid[N]!=fm_rd_checkid[N]))
 				unrdno_outstanding[N] = r_arlen[N]+1;
-			if (mrgrant[N] && (mrindex[N]<NS) && s_axi_arvalid[mrindex[N]] && s_axi_arid[mrindex[N]] != fm_rd_checkid[N])
-				unrdno_outstanding[N] = unrdno_outstanding[N]+s_axi_arlen[N]+1;
+			if (mrgrant[N] && !rgrant[N][NS] && s_axi_arvalid[mrindex[N]]
+					&& s_axi_arid[mrindex[N]] != fm_rd_checkid[N])
+				unrdno_outstanding[N] = unrdno_outstanding[N]+s_axi_arlen[mrindex[N]]+1;
 			if (r_rvalid[N] && (r_rid[N] != fm_rd_checkid[N]))
 				unrdno_outstanding[N] = unrdno_outstanding[N] + 1;
+			if (!rerr_none[N] && rerr_id[N] != fm_rd_checkid[N])
+				unrdno_outstanding[N] = unrdno_outstanding[N] + rerr_outstanding[N];
 			if (M_AXI_RVALID[N]
 				&&(M_AXI_RID[N*IW+:IW] != fm_rd_checkid[N]))
 				unrdno_outstanding[N] = unrdno_outstanding[N] + 1;
@@ -2664,18 +2818,13 @@ module	axixbar #(
 		if (!mrgrant[N] || rgrant[N][NS])
 		begin
 			assert(fm_rd_outstanding[N] == unrd_outstanding[N]);
-			assert(fm_rdid_outstanding[N] == unrdid_outstanding[N]);
+			assert(fm_rdid_outstanding[N]==unrdid_outstanding[N]);
+			assert(!r_rvalid[N]);
 			//
 			//
-			if (fm_rdid_outstanding[N] > 0)
-			begin
-				if (M_AXI_RVALID[N])
-					assert(M_AXI_RID[N*IW+:IW] == fm_rd_checkid[N]);
-				if (r_arvalid[N])
-					assert(r_arid[N] == fm_rd_checkid[N]);
-			end
 			assert(w_mrpending[N] == 0);
 			assert(fm_rd_nbursts[N] == (r_arvalid[N]? 1:0)
+					+ (rerr_none[N] ? 0:1)
 					+((M_AXI_RVALID[N] && M_AXI_RLAST[N])? 1:0));
 			assert(fm_rd_outstanding[N] == unrd_outstanding[N]);
 			assert(fm_rdid_nbursts[N] == unrdid_bursts[N]);
@@ -2686,14 +2835,19 @@ module	axixbar #(
 		end
 
 		always @(*)
+		if (!rgrant[N][NS])
 			assert(fm_rd_nbursts[N] == { 1'b0, w_mrpending[N] }
 				+ (r_arvalid[N] ? 1:0));
+		else begin
+			assert(fm_rd_nbursts[N] == (r_arvalid[N] ? 1:0)
+				+ ((rerr_outstanding[N]>0) ? 1:0)
+				+ (M_AXI_RVALID[N] && M_AXI_RLAST[N] ? 1:0));
 
-		always @(*)
-		if (S_AXI_ARESETN && rgrant[N][NS])
 			assert(fm_rd_outstanding[N]
 				== (r_arvalid[N] ? r_arlen[N]+1:0)
+				+(!rerr_none[N] ? rerr_outstanding[N] : 0)
 				+(M_AXI_RVALID[N] ? 1:0));
+		end
 
 		always @(*)
 		if (!mrgrant[N])
@@ -2826,10 +2980,7 @@ module	axixbar #(
 
 		always @(*)
 		if (srgrant[M])
-		begin
-			assume((fs_rd_checkid[M] == fm_rd_checkid[srindex[M]])
-				|| !fs_rd_ckvalid[M]);
-		end
+			assume(fs_rd_checkid[M] == fm_rd_checkid[srindex[M]]);
 
 		always @(*)
 			assert(fs_awr_nbursts[M] < { 1'b1, {(F_LGDEPTH-1){1'b0}}});
@@ -2861,7 +3012,7 @@ module	axixbar #(
 		always @(*)
 		begin
 			valwslv = 0;
-			if (mwgrant[N] && mwindex[N] < NS)
+			if (mwgrant[N] && !wgrant[N][NS])
 				valwslv = mwindex[N];
 		end
 
@@ -2944,7 +3095,7 @@ module	axixbar #(
 
 			if (r_awvalid[N] && s_axi_awvalid[mwindex[N]])
 			begin
-				assert((s_axi_wvalid[N] && S_AXI_WLAST[N])
+				assert((s_axi_wvalid[mwindex[N]] && S_AXI_WLAST[mwindex[N]])
 					|| (r_wvalid[N] && r_wlast[N]));
 			end
 
@@ -2967,11 +3118,11 @@ module	axixbar #(
 				if (!r_wvalid[N] && !S_AXI_WVALID[mwindex[N]])
 					if (fm_wr_pending[N]>0)
 					assert(fm_wr_addr[N]==fs_wr_addr[mwindex[N]]);
-				else if (S_AXI_WVALID[N] && !r_wvalid[N])
+				else if (S_AXI_WVALID[mwindex[N]] && !r_wvalid[N])
 				begin
 					if (fm_wr_pending[N]>1)
 					assert(fm_wr_addr[N]==next_waddr);
-				end else if (S_AXI_WVALID[N] && r_wvalid[N])
+				end else if (S_AXI_WVALID[mwindex[N]] && r_wvalid[N])
 				begin
 					if (fm_wr_pending[N]>1)
 					assert(fm_wr_addr[N]==dbl_next_waddr);
@@ -3074,147 +3225,110 @@ module	axixbar #(
 			assert(fm_wrid_nbursts[N] == ((r_awvalid[N]&&(r_awid[N] == fm_wr_checkid[N])) ? 1:0));
 		end
 
+		always @(*)
+		if (M_AXI_BVALID[N] && wgrant[N][NS])
+			assert(M_AXI_BRESP[2*N+:2]==INTERCONNECT_ERROR);
+
 		////////////////////////////////////////////////////////////////
 		//
 		// Read counter correlators
 		//
 
 		always @(*)
-		if (mrgrant[N] && (mrindex[N] < NS))
+		if (mrgrant[N] && !rgrant[N][NS])
 		begin
+			//
+			// Burst + outstanding counts and correlations
+			//
 			assert(fm_rd_nbursts[N]
 				== fs_rd_nbursts[mrindex[N]] + unrd_bursts[N]);
 
 			assert(fm_rd_outstanding[N]
 			  == fs_rd_outstanding[mrindex[N]] + unrd_outstanding[N]);
-			assert(fm_rdid_nbursts[N] >= unrdid_bursts[N]);
-			assert(fm_rdid_outstanding[N] >= unrdid_outstanding[N]);
 
-			assert(fm_rd_nbursts[N]-fm_rdid_nbursts[N] >= unrdno_bursts[N]);
+			assert((fm_rd_nbursts[N]-fm_rdid_nbursts[N])
+					== unrdno_bursts[N]
+				+(fs_rd_nbursts[mrindex[N]]
+					-fs_rdid_nbursts[mrindex[N]]));
 			assert(fm_rd_outstanding[N]-fm_rdid_outstanding[N]
-				>= unrdno_outstanding[N]);
+				== unrdno_outstanding[N]
+				+(fs_rd_outstanding[mrindex[N]]-fs_rdid_outstanding[mrindex[N]]));
 
-			if (fm_rd_checkid[N] == fs_rd_checkid[mrindex[N]])
-			begin
-				assert(fm_rdid_nbursts[N]
+			//
+			// We assume above that the respective channel IDs are
+			// identical anytime mrindex[N] is true
+			//
+			// if (fm_rd_checkid[N] == fs_rd_checkid[mrindex[N]])
+			assert(fm_rd_checkid[N] == fs_rd_checkid[mrindex[N]]);
+			//
+			//
+			assert(fm_rdid_nbursts[N]
 				  ==fs_rdid_nbursts[mrindex[N]]+ unrdid_bursts[N]);
 
-				assert(fm_rdid_outstanding[N]
+			assert(fm_rdid_outstanding[N]
 				  == fs_rdid_outstanding[mrindex[N]]
 					+ unrdid_outstanding[N]);
 
-				assert((fm_rd_nbursts[N]-fm_rdid_nbursts[N])
-				  == ((fs_rd_nbursts[mrindex[N]]-fs_rdid_nbursts[mrindex[N]]) + unrdno_bursts[N]));
-				assert((fm_rd_outstanding[N]-fm_rdid_outstanding[N]) == (fs_rd_outstanding[N]-fs_rdid_outstanding[N])+unrdno_outstanding[N]);
-			end else begin
-				/*
-				assert(fm_rdid_nbursts[N]-unrdid_bursts
-				  <= (fs_rd_nbursts[mrindex[N]]
-					    - fs_rdid_nbursts[mrindex[N]])
-					+ unrdid_bursts);
+			assert((fm_rd_nbursts[N]-fm_rdid_nbursts[N])
+				== ((fs_rd_nbursts[mrindex[N]]-fs_rdid_nbursts[mrindex[N]])
+					+ unrdno_bursts[N]));
+			assert((fm_rd_outstanding[N]-fm_rdid_outstanding[N])
+				== (fs_rd_outstanding[mrindex[N]]-fs_rdid_outstanding[mrindex[N]])
+					+ unrdno_outstanding[N]);
+		end else begin
+			//
+			// Burst + outstanding counts and correlations
+			//
+			assert(fm_rd_nbursts[N] == unrd_bursts[N]);
 
-				assert(fm_rdid_outstanding[N]-unrdid_bursts
-				  <= (fs_rd_outstanding[mrindex[N]]
-					    - fs_rdid_outstanding[mrindex[N]])
-					+ unrdid_outstanding);
-				*/
+			assert(fm_rd_outstanding[N] == unrd_outstanding[N]);
 
-				//
-				//
-				if (fm_rdid_nbursts[N] == unrdid_bursts[N])
-				begin
-					// No room for any returns of this
-					// ID, all are accounted for within
-					// the channel
-					assume(!s_axi_rvalid[mrindex[N]]
-						||s_axi_rid[mrindex[N]]!=fm_rd_checkid[N]
-						||!s_axi_rlast[mrindex[N]]);
-				end else if (fm_rdid_nbursts[N]-unrdid_bursts[N] == 1)
-				begin
-					// Only room for one burst return
-					// on this ID, so rlast must be set
-					// appropriately
-					if (s_axi_rvalid[mrindex[N]]
-						&& s_axi_rid[mrindex[N]]==fm_rd_checkid[N])
-						assume(s_axi_rlast[mrindex[N]]
-						 == ((fm_rdid_outstanding[N]-unrdid_outstanding[N])==1));
-				end
+			assert((fm_rd_nbursts[N]-fm_rdid_nbursts[N])
+					== unrdno_bursts[N]);
+			assert(fm_rd_outstanding[N]-fm_rdid_outstanding[N]
+				== unrdno_outstanding[N]);
 
-				if (fm_rdid_outstanding[N] == unrdid_outstanding[N])
-				begin
-					// No room for any returns in this
-					// channel, all of the expected returns
-					// are already in the channel
-					assume(!s_axi_rvalid[mrindex[N]]
-						||s_axi_rid[mrindex[N]]!=fm_rd_checkid[N]);
-				end
+			//
+			// We assume above that the respective channel IDs are
+			// identical anytime mrindex[N] is true
+			//
+			assert(fm_rdid_nbursts[N] == unrdid_bursts[N]);
 
-				if (fm_rdid_outstanding[N] - unrdid_outstanding[N]
-				      == fm_rdid_nbursts[N] - unrdid_bursts[N])
-				begin
-					// Each burst must have at least one
-					// sample
-					assume(!s_axi_rvalid[mrindex[N]]
-						||s_axi_rid[mrindex[N]]!=fm_rd_checkid[N]
-						||s_axi_rlast[mrindex[N]]);
-				end
+			assert(fm_rdid_outstanding[N] == unrdid_outstanding[N]);
 
-				if ((fm_rd_nbursts[N]-fm_rdid_nbursts[N])
-							== unrdno_bursts[N])
-				begin
-					assume(!s_axi_rvalid[mrindex[N]]
-						||s_axi_rid[mrindex[N]]==fm_rd_checkid[N]
-						||!s_axi_rlast[mrindex[N]]);
-				end else if ((fm_rd_nbursts[N]-fm_rdid_nbursts[N]
-						- unrdno_bursts[N])==1)
-				begin
-					if (s_axi_rvalid[mrindex[N]]
-						&& s_axi_rid[mrindex[N]]!=fm_rd_checkid[N])
-						assume(s_axi_rlast[mrindex[N]]
-						 == ((fm_rd_outstanding[N] - fm_rdid_outstanding[N]-unrdno_outstanding[N])==1));
-				end
+			assert((fm_rd_nbursts[N]-fm_rdid_nbursts[N])
+				== unrdno_bursts[N]);
+			assert((fm_rd_outstanding[N]-fm_rdid_outstanding[N])
+				== unrdno_outstanding[N]);
 
-				if((fm_rd_outstanding[N]-fm_rdid_outstanding[N])
-							== unrdno_outstanding[N])
-				begin
-					assume(!s_axi_rvalid[mrindex[N]]
-						||s_axi_rid[mrindex[N]]==fm_rd_checkid[N]);
-				end
-
-				if ((fm_rd_outstanding[N]-fm_rdid_outstanding[N]
-						- unrdno_outstanding[N])
-					== (fm_rd_nbursts[N]-fm_rdid_nbursts[N]
-						- unrdno_bursts[N]))
-				begin
-					assume(!s_axi_rvalid[mrindex[N]]
-						||s_axi_rid[mrindex[N]]==fm_rd_checkid[N]
-						||s_axi_rlast[N]);
-				end
-			end
+			assert(!r_rvalid[N]);
 		end
 
+		always @(*)
+		if (!mrgrant[N])
+		begin
+			assert(!M_AXI_RVALID[N]);
+			assert(!r_rvalid[N]);
+		end
+
+		always @(*)
+		if (!rgrant[N][NS])
+			assert(rerr_none[N]);
 
 		//
 		// Check (or assume) the ckvalid and ckign signals
 		//
-		/*
-		reg	same_check;
 		always @(*)
+			assume(!fm_rd_ckvalid[N]);
+
+		always @(*)
+		if (M_AXI_RVALID[N] && rgrant[N][NS] && !rerr_none[N])
 		begin
-			same_check = (mrgrant[N] && fs_rd_ckvalid[mrindex[N]]
-				&&fm_rd_checkid[N]==fs_rd_checkid[mrindex[N]]);
-			if (!fm_rd_ckvalid[M])
-				same_check = 0;
-			if (fm_rdid_ckign_nbursts[N]
-				!= fs_rdid_ckign_nbursts[mrindex[N]])
-				+ ((r_rvalid[N] && r_rid[N] == fm_rd_checkid[N]
-					& r_rlast[N])?1:0))
-				same_check = 0;
-		end;
-			
-		always @(*)
-		if (mrgrant[N] && (mrindex[N] < NS) && )
-		*/
+			assert(!M_AXI_RVALID[N]
+				|| M_AXI_RRESP[2*N+:2]==INTERCONNECT_ERROR);
+
+			assert(fm_rd_nbursts[N] == 1 + (r_arvalid[N] ? 1:0));
+		end
 
 	end endgenerate
 
@@ -3356,7 +3470,6 @@ module	axixbar #(
 	//
 	////////////////////////////////////////////////////////////////////////
 	// //
-`ifdef	COVER_CHECKS
 	// Can every master reach every slave?
 	// Can things transition without dropping the request line(s)?
 	generate for(N=0; N<NM; N=N+1)
@@ -3409,10 +3522,13 @@ module	axixbar #(
 		else
 			was_wevery <= was_wevery || (&w_every);
 
-		always @(*)
-			cover(!mwgrant[N] && whsreturn);	// @27
-		always @(*)
-			cover(!mwgrant[N] && was_wevery);	// @27
+		if (OPT_WRITES)
+		begin
+			always @(*)
+				cover(!mwgrant[N] && whsreturn);	// @27
+			always @(*)
+				cover(!mwgrant[N] && was_wevery);	// @27
+		end
 
 		// err_wr_return is a test to make certain we can return a
 		// bus error on the write channel.
@@ -3424,10 +3540,13 @@ module	axixbar #(
 				&& (M_AXI_BRESP[2*N+:2]==INTERCONNECT_ERROR))
 			err_wr_return = 1;
 
-		always @(*) // @!
-			cover(err_wr_return);
-		always @(*) // @!
-			cover(!mwgrant[N] && err_wr_return);
+		if (OPT_WRITES)
+		begin
+			always @(*) // @!
+				cover(err_wr_return);
+			always @(*) // @!
+				cover(!mwgrant[N] && err_wr_return);
+		end
 
 		always @(*)
 		if (M_AXI_BVALID[N])
@@ -3481,10 +3600,13 @@ module	axixbar #(
 		if (M_AXI_RVALID[N])
 			assert($stable(mrindex[N]));
 
-		always @(*)
-			cover(!mrgrant[N] && rhsreturn);	// @26
-		always @(*)
-			cover(!mrgrant[N] && was_revery);	// @26
+		if (OPT_READS)
+		begin
+			always @(*)
+				cover(!mrgrant[N] && rhsreturn);	// @26
+			always @(*)
+				cover(!mrgrant[N] && was_revery);	// @26
+		end
 
 		initial	err_rd_return = 0;
 		always @(posedge S_AXI_ACLK)
@@ -3494,23 +3616,19 @@ module	axixbar #(
 				&& (M_AXI_RRESP[2*N+:2]==INTERCONNECT_ERROR))
 			err_rd_return = 1;
 
-		always @(*)
-			cover(M_AXI_ARVALID[N] && rrequest[N][NS]);
-		always @(*)
-			cover(rgrant[N][NS]);
-		always @(*)
-			cover(err_rd_return);
-		always @(*)
-			cover(!mrgrant[N] && err_rd_return); //@!
+		if (OPT_READS)
+		begin
+			always @(*)
+				cover(M_AXI_ARVALID[N] && rrequest[N][NS]);
+			always @(*)
+				cover(rgrant[N][NS]);
+			always @(*)
+				cover(err_rd_return);
+			always @(*)
+				cover(!mrgrant[N] && err_rd_return); //@!
+		end
 
-		always @(*)
-		if (M_AXI_BVALID[N] && wgrant[N][NS])
-			assert(M_AXI_BRESP[2*N+:2]==INTERCONNECT_ERROR);
-		always @(*)
-		if (M_AXI_RVALID[N] && rgrant[N][NS])
-			assert(M_AXI_RRESP[2*N+:2]==INTERCONNECT_ERROR);
 	end endgenerate
-`endif	// COVER_CHECKS
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -3717,9 +3835,6 @@ module	axixbar #(
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
-	localparam [0:0]	OPT_READS  = 0;
-	localparam [0:0]	OPT_WRITES = 1;
-
 	generate for(N=0; N<NM; N=N+1)
 	begin
 
@@ -3749,21 +3864,10 @@ module	axixbar #(
 				assert(fm_rd_nbursts[N] == 0);
 		end
 
-		always @(*)
-			assume(!rrequest[N][NS]);
-		always @(*)
-			assert(!rgrant[N][NS]);
 	end endgenerate
 
 
 	always@(*)
 		assert(OPT_READS | OPT_WRITES);
-	always @(*)
-		assume(srgrant[NS-1:1] == 0);
-	always @(*)
-		assume(mrgrant[NM-1:1] == 0);
-	//	always @(*)
-	//	for(iN=0; iN<NM; iN=iN+1)
-	//		assume(fm_rd_nbursts[iN] <= 1);
 `endif
 endmodule

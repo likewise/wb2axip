@@ -42,7 +42,7 @@
 ################################################################################
 ##
 ##
-TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar axilxbar wbp2classic demofull xlnxfull axisafety # wbm2axisp axim2wbsp
+TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar axilxbar wbp2classic demofull xlnxfull axisafety wbm2axisp # axim2wbsp
 .PHONY: $(TESTS)
 all: $(TESTS)
 RTL := ../../rtl
@@ -89,9 +89,31 @@ $(WBARB)_cvr/PASS: $(RTL)/$(WBARB).v $(WBARB).sby $(WB)
 	sby -f $(WBARB).sby
 
 .PHONY: $(WB2AXI)
-$(WB2AXI): $(WB2AXI)/PASS
-$(WB2AXI)/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
-	sby -f $(WB2AXI).sby
+$(WB2AXI): $(WB2AXI)_prfx8/PASS    $(WB2AXI)_prfx16/PASS
+$(WB2AXI): $(WB2AXI)_prfe32/PASS   $(WB2AXI)_prfx32/PASS
+$(WB2AXI): $(WB2AXI)_prfx64/PASS   $(WB2AXI)_prfx128/PASS
+$(WB2AXI): $(WB2AXI)_prfx256/PASS  $(WB2AXI)_prfx512/PASS
+$(WB2AXI): $(WB2AXI)_prfx1024/PASS $(WB2AXI)_cvr/PASS
+$(WB2AXI)_prfx8/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
+	sby -f $(WB2AXI).sby prfx8
+$(WB2AXI)_prfx16/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
+	sby -f $(WB2AXI).sby prfx16
+$(WB2AXI)_prfe32/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
+	sby -f $(WB2AXI).sby prfe32
+$(WB2AXI)_prfx32/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
+	sby -f $(WB2AXI).sby prfx32
+$(WB2AXI)_prfx64/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
+	sby -f $(WB2AXI).sby prfx64
+$(WB2AXI)_prfx128/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
+	sby -f $(WB2AXI).sby prfx128
+$(WB2AXI)_prfx256/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
+	sby -f $(WB2AXI).sby prfx256
+$(WB2AXI)_prfx512/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
+	sby -f $(WB2AXI).sby prfx512
+$(WB2AXI)_prfx1024/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
+	sby -f $(WB2AXI).sby prfx1024
+$(WB2AXI)_cvr/PASS: $(RTL)/$(WB2AXI).v $(WB2AXI).sby $(WB) $(AXI)
+	sby -f $(WB2AXI).sby cvr
 
 $(RDLITE): $(RDLITE)_prf/PASS $(RDLITE)_cvr/PASS
 $(RDLITE)_prf/PASS: $(RDLITE).sby $(RTL)/$(RDLITE).v $(WB) $(AXIL)
@@ -413,15 +435,22 @@ $(AXISAFETY)_cvr/PASS:   $(AXISAFETY).sby $(RTL)/$(AXISAFETY).v $(AXI)
 
 .PHONY: clean
 clean:
-	rm -rf  $(WBARB)_prf/ $(WBARB)_cvr/
-	rm -rf  $(WB2LITE)_cvr/ $(WB2LITE)_prf/
-	rm -rf  $(RDLITE)_cvr/  $(RDLITE)_prf
-	rm -rf  $(WRLITE)_cvr/  $(WRLITE)_prf
-	rm -rf  $(AXLITE)_cvr/  $(AXLITE)_prf
-	rm -rf  $(DEMOAXI)_cvr/ $(DEMOAXI)_prf
+	rm -rf  $(DEMOAXI)_*/
+	rm -rf  $(WBARB)_*/
+	rm -rf  $(WB2LITE)_*/
+	rm -rf  $(RDLITE)_*/
+	rm -rf  $(WRLITE)_*/
+	rm -rf  $(AXLITE)_*/
+	rm -rf  $(XILINXFULL)_*/
+	rm -rf  $(AXILXBAR)_*/
+	rm -rf  $(WBXBAR)_*/
+	rm -rf  $(WBP2CLASSIC)_*/
+	rm -rf  $(WBC2PIPELIN)_*/
+	rm -rf  $(DEMOFULL)_*/
+	rm -rf  $(AXISAFETY)_*/
 	@# The three broken cores, to include Xilinx's
-	rm -rf  $(WB2AXI)/
-	rm -rf  $(AXI2WB)/
-	rm -rf  $(XILINXDEMO)_cvr/ $(XILINXDEMO)_prf
-	rm -rf  $(XLNXSTREAM)_cvr/ $(XLNXSTREAM)_prf
+	rm -rf  $(WB2AXI)_*/
+	rm -rf  $(AXI2WB)_*/
+	rm -rf  $(XILINXDEMO)_*/
+	rm -rf  $(XLNXSTREAM)_*/
 	# rm -f *.check
