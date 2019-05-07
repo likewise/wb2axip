@@ -82,7 +82,7 @@ module wbm2axisp #(
 	input	wire			i_axi_wready,  // Write data ready
 	output	reg	[C_AXI_DATA_WIDTH-1:0]	o_axi_wdata,	// Write data
 	output	reg	[C_AXI_DATA_WIDTH/8-1:0] o_axi_wstrb,	// Write strobes
-	output	wire			o_axi_wlast,	// Last write transaction   
+	output	wire			o_axi_wlast,	// Last write transaction
 	output	reg			o_axi_wvalid,	// Write valid
 
 // AXI write response channel signals
@@ -104,7 +104,7 @@ module wbm2axisp #(
 	output	wire	[3:0]		o_axi_arqos,	// Read Protection type
 	output	reg			o_axi_arvalid,	// Read address valid
 
-// AXI read data channel signals   
+// AXI read data channel signals
 	input wire [C_AXI_ID_WIDTH-1:0]	i_axi_rid,     // Response ID
 	input	wire	[1:0]		i_axi_rresp,   // Read response
 	input	wire			i_axi_rvalid,  // Read reponse valid
@@ -589,7 +589,8 @@ module wbm2axisp #(
 	//
 	//////////////////////////////////////////////
 	always @(*)
-		assume(f_past_valid || i_reset);
+	if (!f_past_valid)
+		assume(i_reset);
 
 	fwb_slave #(.DW(DW),.AW(AW),
 			.F_MAX_STALL(0),
@@ -617,22 +618,23 @@ module wbm2axisp #(
 		.OPT_MAXBURST(0),
 		.OPT_EXCLUSIVE(0),
 		.OPT_NARROW_BURST(1),
-		.F_AXI_MAXSTALL(0),
+		.F_AXI_MAXSTALL(5),
+		.F_AXI_MAXRSTALL(2),
 		.F_LGDEPTH(F_LGDEPTH),
 		.F_AXI_MAXDELAY(3))
 		f_axi(.i_clk(i_clk), .i_axi_reset_n(!i_reset),
 			// Write address channel
-			.i_axi_awready(i_axi_awready), 
-			.i_axi_awid(   o_axi_awid), 
-			.i_axi_awaddr( o_axi_awaddr), 
-			.i_axi_awlen(  o_axi_awlen), 
-			.i_axi_awsize( o_axi_awsize), 
-			.i_axi_awburst(o_axi_awburst), 
-			.i_axi_awlock( o_axi_awlock), 
-			.i_axi_awcache(o_axi_awcache), 
-			.i_axi_awprot( o_axi_awprot), 
-			.i_axi_awqos(  o_axi_awqos), 
-			.i_axi_awvalid(o_axi_awvalid), 
+			.i_axi_awready(i_axi_awready),
+			.i_axi_awid(   o_axi_awid),
+			.i_axi_awaddr( o_axi_awaddr),
+			.i_axi_awlen(  o_axi_awlen),
+			.i_axi_awsize( o_axi_awsize),
+			.i_axi_awburst(o_axi_awburst),
+			.i_axi_awlock( o_axi_awlock),
+			.i_axi_awcache(o_axi_awcache),
+			.i_axi_awprot( o_axi_awprot),
+			.i_axi_awqos(  o_axi_awqos),
+			.i_axi_awvalid(o_axi_awvalid),
 			// Write data channel
 			.i_axi_wready( i_axi_wready),
 			.i_axi_wdata(  o_axi_wdata),
@@ -749,9 +751,15 @@ module wbm2axisp #(
 	begin
 		assert(npending == (r_stb ? 1:0) + (o_axi_awvalid ? 1:0)
 			+ f_axi_awr_nbursts);
+		assert(!o_axi_arvalid);
+		assert(f_axi_rd_nbursts == 0);
+		assert(!i_axi_rvalid);
 	end else begin
 		assert(npending == (r_stb ? 1:0) + (o_axi_arvalid ? 1:0)
 			+ f_axi_rd_nbursts);
+		assert(!o_axi_awvalid);
+		assert(!o_axi_wvalid);
+		assert(f_axi_awr_nbursts == 0);
 	end
 
 	//////////////////////////////////////////////
@@ -947,7 +955,8 @@ module wbm2axisp #(
 		assert(o_axi_awvalid && o_axi_wvalid);
 		if (i_axi_awready != i_axi_wready)
 			pmseq <= 0;
-		assume(i_axi_awready == i_axi_wready);
+		if (i_axi_awready != i_axi_wready)
+			pmseq <= 0;
 		assert(o_axi_awaddr == { f_wb_addr, axi_lsbs });
 		assert(direction);
 		assert(o_axi_wdata == {(C_AXI_DATA_WIDTH/DW){f_wb_data}});
@@ -1013,7 +1022,7 @@ module wbm2axisp #(
 	begin
 		// Read request got stuck in the skid buffer.  Wait for
 		// it to go forward
-		// 
+		//
 		if ((!direction || empty) && !flushing && !nearfull
 			&&(!o_axi_arvalid || i_axi_arready))
 			pmseq <= 6;
@@ -1128,16 +1137,12 @@ module wbm2axisp #(
 		end
 	end
 
-//	always @(posedge i_clk)
-//		cover(f_past_valid && $past(pmseq) == 9
-//			&& empty && !flushing);
-
 	always @(*)
 	if (DW == C_AXI_DATA_WIDTH)
 		f_valid_fifo_data_check = 1;
 	else begin
 		f_valid_fifo_data_check = f_fifo_check_addr_valid;
-		
+
 		if (f_fifo_check_data != f_wb_addr[SUBW-1:0])
 			f_valid_fifo_data_check = 0;
 	end
@@ -1147,7 +1152,7 @@ module wbm2axisp #(
 		f_valid_fifo_rd_data_check = 1;
 	else begin
 		f_valid_fifo_rd_data_check = f_valid_fifo_data_check;
-		
+
 		if (!f_axi_rd_ckvalid)
 			f_valid_fifo_rd_data_check = 0;
 		if (f_axi_rd_ckaddr != f_const_addr)
@@ -1164,7 +1169,6 @@ module wbm2axisp #(
 			assert(f_axi_wr_pending == 0);
 			assert(o_axi_wvalid == o_axi_awvalid);
 		end
-		assume(i_axi_wready == i_axi_awready);
 	end
 
 	generate if (DW == C_AXI_DATA_WIDTH)
@@ -1288,8 +1292,82 @@ module wbm2axisp #(
 			assert(o_axi_araddr[DWSIZE-1:0] == 0);
 
 	end endgenerate
+
+	////////////////////////////////////////////////////////////////////////
 	//
-	// ??? How shall we do this?
+	// Cover checks
 	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+	reg	[F_LGDEPTH-1:0]	r_hit_reads, r_hit_writes,
+				r_check_fault, check_fault;
+
+	initial	r_hit_reads = 0;
+	always @(posedge i_clk)
+	if (i_reset)
+		r_hit_writes <= 0;
+	else if (f_axi_awr_nbursts > 3)
+		r_hit_writes <= 1;
+
+	initial	r_hit_reads = 0;
+	always @(posedge i_clk)
+	if (i_reset)
+		r_hit_reads <= 0;
+	else if (f_axi_rd_nbursts > 3)
+		r_hit_reads <= 1;
+
+	always @(*)
+	begin
+		check_fault = 0;
+		if (!i_wb_cyc && o_axi_awvalid)
+			check_fault = 1;
+		if (!i_wb_cyc && o_axi_wvalid)
+			check_fault = 1;
+		if (!i_wb_cyc && f_axi_awr_nbursts > 0)
+			check_fault = 1;
+		if (!i_wb_cyc && i_axi_bvalid)
+			check_fault = 1;
+		//
+		if (!i_wb_cyc && o_axi_arvalid)
+			check_fault = 1;
+		if (!i_wb_cyc && f_axi_rd_outstanding > 0)
+			check_fault = 1;
+		if (!i_wb_cyc && i_axi_rvalid)
+			check_fault = 1;
+		if (!i_wb_cyc && (o_wb_ack | o_wb_err))
+			check_fault = 1;
+
+		if (flushing)
+			check_fault = 1;
+	end
+
+	initial	r_check_fault = 0;
+	always @(posedge i_clk)
+	if (i_reset)
+		r_check_fault <= 0;
+	else if (check_fault)
+		r_check_fault <= 1;
+
+	always @(*)
+		cover(r_hit_writes && r_hit_reads && f_axi_rd_nbursts == 0
+			&& f_axi_awr_nbursts == 0
+			&& !o_axi_awvalid && !o_axi_arvalid && !o_axi_wvalid
+			&& !i_axi_bvalid && !i_axi_rvalid
+			&& !o_wb_ack && !o_wb_stall && !i_wb_stb
+			&& !check_fault && !r_check_fault);
+
+
+	generate if (DW != C_AXI_DATA_WIDTH)
+	begin
+		// It will only ever take us 8-steps in our sequence
+		// if DW != C_AXI_DATA_WIDTH, in which case we need
+		// to take an extra clock to return the right data
+		always @(*)
+			cover(pmseq == 8);
+	end else begin
+		always @(*)
+			cover(pmseq == 7);
+	end endgenerate
 `endif
 endmodule
