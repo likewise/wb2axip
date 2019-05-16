@@ -1,23 +1,36 @@
 [tasks]
-prf4x8_lp   nxm opt_lowpower
-prf4x8      nxm
-cvr4x8_lp   nxl opt_lowpower cvr
-cvr4x8      nxl              cvr
-prf1x8_lp   oxm opt_lowpower
-prf1x8      oxm
-cvr1x3_lp   oxl opt_lowpower cvr
-cvr1x3      oxl              cvr
+#
+# Full connectivity
+prf4x8_lpg      nxm opt_lowpower opt_linger
+prf4x8_lin      nxm              opt_linger
+prf4x8_lp       nxm opt_lowpower
+prf4x8          nxm
+cvr3x3_lpg  cvr nxl opt_lowpower opt_linger
+cvr3x3_lin  cvr nxl              opt_linger
+cvr3x3_lp   cvr nxl opt_lowpower
+cvr3x3      cvr nxl
 
-prf4x1_lp   nxo opt_lowpower
-prf4x1      nxo
-cvr4x1_lp   nxo opt_lowpower cvr
-cvr4x1      nxo              cvr
+#
+# One master to many slaves
+prf1x8_lp       oxm opt_lowpower
+prf1x8          oxm
+cvr1x3_lpg  cvr oxl opt_lowpower opt_linger
+cvr1x3_lin  cvr oxl              opt_linger
+cvr1x3_lp   cvr oxl opt_lowpower
+cvr1x3      cvr oxl
+
+#
+# Many masters to one slave
+prf4x1_lp       nxo opt_lowpower
+prf4x1          nxo
+cvr4x1_lp   cvr nxo opt_lowpower
+cvr4x1      cvr nxo
 
 [options]
 ~cvr: mode prove
-~cvr: depth 10
+~cvr: depth 2
 cvr:  mode cover
-cvr:  depth 64
+cvr:  depth 23
 
 [engines]
 smtbmc boolector
@@ -30,13 +43,23 @@ read -formal faxi_master.v
 read -formal faxi_addr.v
 read -formal faxi_valaddr.v
 read -formal faxi_wstrb.v
-nxm: chparam -set NM 4 -set NS 8 axixbar
-oxm: chparam -set NM 1 -set NS 8 axixbar
-oxl: chparam -set NM 1 -set NS 3 axixbar
-nxl: chparam -set NM 3 -set NS 3 axixbar
-nxo: chparam -set NM 4 -set NS 1 axixbar
-opt_lowpower:    chparam -set OPT_LOWPOWER  1 axixbar
-~opt_lowpower:   chparam -set OPT_LOWPOWER  0 axixbar
+--pycode-begin--
+cmd = "hierarchy -top axixbar"
+if ("nxm" in tags):
+	cmd += " -chparam  NM 4 -chparam NS 8"
+if ("oxm" in tags):
+	cmd += " -chparam  NM 1 -chparam NS 8"
+if ("oxl" in tags):
+	cmd += " -chparam  NM 1 -chparam NS 3"
+if ("nxl" in tags):
+	cmd += " -chparam  NM 3 -chparam NS 3"
+if ("nxo" in tags):
+	cmd += " -chparam  NM 4 -chparam NS 1"
+cmd += " -chparam C_AXI_ADDR_WIDTH 16"
+cmd += " -chparam OPT_LOWPOWER %d" % (1 if "opt_lowpower" in tags else 0)
+cmd += " -chparam OPT_LINGER   %d" % (4 if "opt_linger"   in tags else 0)
+output(cmd)
+--pycode-end--
 prep -top axixbar
 
 [files]
