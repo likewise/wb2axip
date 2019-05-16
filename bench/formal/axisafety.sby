@@ -1,13 +1,15 @@
 [tasks]
-cvr
-prf
-fault prf
+cvr				# 34 required steps
+prf				# 16 required steps
+fault prf			# 15 required steps
+prfr          prf opt_reset	# 16 required steps
+faultr  fault prf opt_reset
 
 [options]
 cvr: mode cover
-cvr: depth 60
+cvr: depth 40
 prf: mode prove
-prf: depth 18
+prf: depth 16
 append 0
 
 [engines]
@@ -22,8 +24,13 @@ read -formal faxi_master.v
 read -formal faxi_addr.v
 read -formal faxi_valaddr.v
 read -formal faxi_wstrb.v
-~fault: chparam -set F_OPT_FAULTLESS 1 axisafety
-fault:  chparam -set F_OPT_FAULTLESS 0 axisafety
+--pycode-begin--
+cmd = "hierarchy -top axisafety"
+cmd += " -chparam F_OPT_FAULTLESS %d" % (0 if "fault"      in tags else 1)
+cmd += " -chparam OPT_SELF_RESET  %d" % (1 if "opt_reset"  in tags else 0)
+cmd += " -chparam OPT_TIMEOUT     10"
+output(cmd)
+--pycode-end--
 prep -top axisafety
 
 [files]

@@ -71,6 +71,13 @@
 //		formal verification, it needs to be kept short ...)
 //		Feel free to set this even as large as 1ms if you would like.
 //
+//	5) OPT_SELF_RESET	If set, will send a reset signal to the slave
+//		following any write or read fault.  This will cause the other
+//		side of the link (write or read) to fault as well.  Once the
+//		channel then becomes inactive, the slave will be released from
+//		reset and will be able to interact with the rest of the bus
+//		again.
+//
 // Performance:	As mentioned above, this core can handle one read burst and one
 //		write burst at a time, no more.  Further, the core will delay
 //	an input path by one clock and the output path by another clock, so that
@@ -144,6 +151,7 @@ module axisafety #(
 	parameter C_S_AXI_ID_WIDTH	= 1,
 	parameter C_S_AXI_DATA_WIDTH	= 32,
 	parameter C_S_AXI_ADDR_WIDTH	= 6,
+	parameter [0:0] OPT_SELF_RESET  = 0,
 	//
 	// I use the following abbreviations, IW, DW, and AW, to simplify
 	// the code below (and to help it fit within an 80 col terminal)
@@ -155,7 +163,7 @@ module axisafety #(
 	// between raising the *VALID signal and when the respective
 	// *VALID return signal must be high.  You might wish to set this
 	// to a very high number, to allow your core to work its magic.
-	parameter	OPT_TIMEOUT = 10
+	parameter	OPT_TIMEOUT = 20
 	) (
 		//
 		output	reg	o_read_fault,
@@ -166,7 +174,8 @@ module axisafety #(
 		// Global Clock Signal
 		input wire			S_AXI_ACLK,
 		// Global Reset Signal. This Signal is Active LOW
-		input wire			S_AXI_ARESETN,
+		input	reg			S_AXI_ARESETN,
+		output	reg			M_AXI_ARESETN,
 		//
 		// The input side.  This is where slave requests come into
 		// the core.
@@ -267,6 +276,7 @@ module axisafety #(
 	//
 	//
 	reg			faulty_write_return, faulty_read_return;
+	reg			clear_fault;
 	//
 	// Timer/timeout variables
 	reg	[LGTIMEOUT-1:0]	write_timer,   read_timer;
@@ -334,16 +344,35 @@ module axisafety #(
 	reg	[0:0]	s_wbursts;
 	reg	[8:0]	m_wpending;
 	reg		m_wempty, m_wlastctr;
+	reg		waddr_valid, raddr_valid;
 
+	reg	last_sreset, last_sreset_2;
 
-	initial	S_AXI_AWREADY = 1;
+	initial	S_AXI_AWREADY = (OPT_SELF_RESET) ? 0:1;
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		S_AXI_AWREADY <= 1;
+		S_AXI_AWREADY <= !OPT_SELF_RESET;
 	else if (S_AXI_AWVALID && S_AXI_AWREADY)
 		S_AXI_AWREADY <= 0;
+	else if (clear_fault)
+		S_AXI_AWREADY <= 1;
 	else if (!S_AXI_AWREADY)
-		S_AXI_AWREADY <= !S_AXI_WREADY && S_AXI_BVALID && S_AXI_BREADY;
+		S_AXI_AWREADY <= !S_AXI_AWREADY && S_AXI_BVALID && S_AXI_BREADY;
+
+	generate if (OPT_SELF_RESET)
+	begin
+		initial	waddr_valid = 0;
+		always @(posedge S_AXI_ACLK)
+		if (!S_AXI_ARESETN)
+			waddr_valid <= 0;
+		else if (S_AXI_AWVALID && S_AXI_AWREADY)
+			waddr_valid <= 1;
+		else if (waddr_valid)
+			waddr_valid <= !S_AXI_BVALID || !S_AXI_BREADY;
+	end else begin
+		always @(*)
+			waddr_valid = !S_AXI_AWREADY;
+	end endgenerate
 
 	//
 	// Double buffer for the AW* channel
@@ -426,7 +455,7 @@ module axisafety #(
 			M_AXI_AWQOS   <= m_awqos;
 		end
 
-		if (!S_AXI_ARESETN)
+		if (!M_AXI_ARESETN)
 			M_AXI_AWVALID <= 0;
 	end
 
@@ -470,7 +499,7 @@ module axisafety #(
 	initial	m_wempty   = 1;
 	initial	m_wlastctr = 0;
 	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN)
+	if (!S_AXI_ARESETN || o_write_fault)
 	begin
 		m_wpending <= 0;
 		m_wempty   <= 1;
@@ -529,7 +558,7 @@ module axisafety #(
 			S_AXI_WREADY <= 1;
 		else
 			S_AXI_WREADY <= 0;
-	end else if ((s_wbursts == 0)&&(!S_AXI_AWREADY)
+	end else if ((s_wbursts == 0)&&(waddr_valid)
 				&&(o_write_fault || M_AXI_WREADY))
 		S_AXI_WREADY <= 1;
 	else if (S_AXI_AWVALID && S_AXI_AWREADY)
@@ -552,7 +581,7 @@ module axisafety #(
 		r_wdata <= S_AXI_WDATA;
 		r_wstrb <= S_AXI_WSTRB;
 		r_wlast <= S_AXI_WLAST;
-	end else if (o_write_fault || M_AXI_WREADY)
+	end else if (o_write_fault || M_AXI_WREADY || !M_AXI_ARESETN)
 		r_wvalid <= 0;
 
 	//
@@ -605,7 +634,7 @@ module axisafety #(
 
 		// Override the WVALID signal (only) on reset, voiding any
 		// output we might otherwise send.
-		if (!S_AXI_ARESETN)
+		if (!M_AXI_ARESETN)
 			M_AXI_WVALID <= 0;
 	end
 
@@ -620,12 +649,14 @@ module axisafety #(
 	// if the slave responded in time.)
 	initial	write_timer = 0;
 	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN)
+	if (!S_AXI_ARESETN || !waddr_valid)
 		write_timer <= 0;
-	else if (M_AXI_BVALID || S_AXI_AWREADY)
+	else if (!o_write_fault && M_AXI_BVALID)
 		write_timer <= 0;
-	else if (S_AXI_WVALID && S_AXI_WREADY)
+	else if (S_AXI_WREADY)
 		write_timer <= 0;
+	// else if (!o_write_fault && !m_wempty && (!S_AXI_WVALID || S_AXI_WREADY))
+	//	write_timer <= 0;
 	else if (!(&write_timer))
 		write_timer <= write_timer + 1;
 
@@ -637,13 +668,13 @@ module axisafety #(
 	// channel off line.
 	initial	write_timeout = 0;
 	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN)
+	if (!S_AXI_ARESETN || clear_fault)
 		write_timeout <= 0;
-	else if (M_AXI_BVALID || S_AXI_AWREADY)
+	else if (M_AXI_BVALID)
 		write_timeout <= write_timeout;
 	else if (S_AXI_WVALID && S_AXI_WREADY)
 		write_timeout <= write_timeout;
-	else if (write_timer == OPT_TIMEOUT)
+	else if (write_timer >= OPT_TIMEOUT)
 		write_timeout <= 1;
 
 	//
@@ -696,9 +727,9 @@ module axisafety #(
 	// Here we do just a bit more:
 	initial	o_write_fault = 0;
 	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN)
+	if (!S_AXI_ARESETN || clear_fault)
 		o_write_fault <= 0;
-	else if (write_timeout)
+	else if ((!M_AXI_ARESETN&&o_read_fault) || write_timeout)
 		o_write_fault <= 1;
 	else if (M_AXI_BVALID && M_AXI_BREADY)
 		o_write_fault <= (o_write_fault) || faulty_write_return;
@@ -764,15 +795,22 @@ module axisafety #(
 	//
 
 	// Read address channel
-	initial	S_AXI_ARREADY = 1;
+	initial	S_AXI_ARREADY = (OPT_SELF_RESET) ? 0:1;
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
-		S_AXI_ARREADY <= 1;
+		S_AXI_ARREADY <= !OPT_SELF_RESET;
 	else if (S_AXI_ARVALID && S_AXI_ARREADY)
-	begin
 		S_AXI_ARREADY <= 0;
-	end else if (!S_AXI_ARREADY)
+	else if (clear_fault)
+		S_AXI_ARREADY <= 1;
+	else if (!S_AXI_ARREADY)
 		S_AXI_ARREADY <= (S_AXI_RVALID && S_AXI_RLAST && S_AXI_RREADY);
+
+	always @(*)
+	if (OPT_SELF_RESET)
+		raddr_valid = !rfifo_empty;
+	else
+		raddr_valid = !S_AXI_ARREADY;
 
 	//
 	// Double buffer the values associated with any read address request
@@ -795,7 +833,7 @@ module axisafety #(
 		end else if (M_AXI_ARREADY)
 			r_arvalid <= 0;
 
-		if (!S_AXI_ARESETN)
+		if (!M_AXI_ARESETN)
 			r_arvalid <= 0;
 	end
 
@@ -852,7 +890,7 @@ module axisafety #(
 			M_AXI_ARQOS   <= m_arqos;
 		end
 
-		if (!S_AXI_ARESETN)
+		if (!M_AXI_ARESETN)
 			M_AXI_ARVALID <= 0;
 	end
 
@@ -870,9 +908,9 @@ module axisafety #(
 	// read.  Once the count saturates, it stops counting.
 	initial	read_timer = 0;
 	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN)
+	if (!S_AXI_ARESETN || clear_fault)
 		read_timer <= 0;
-	else if ((rfifo_empty)||(S_AXI_RVALID))
+	else if (rfifo_empty||(S_AXI_RVALID))
 		read_timer <= 0;
 	else if (M_AXI_RVALID)
 		read_timer <= 0;
@@ -885,9 +923,9 @@ module axisafety #(
 	// timeout condition can only be cleared by a reset.
 	initial	read_timeout = 0;
 	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN)
+	if (!S_AXI_ARESETN || clear_fault)
 		read_timeout <= 0;
-	else if ((rfifo_empty)||(S_AXI_RVALID))
+	else if (rfifo_empty||S_AXI_RVALID)
 		read_timeout <= read_timeout;
 	else if (M_AXI_RVALID)
 		read_timeout <= read_timeout;
@@ -923,15 +961,15 @@ module axisafety #(
 
 	initial	o_read_fault = 0;
 	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN)
+	if (!S_AXI_ARESETN || clear_fault)
 		o_read_fault <= 0;
-	else if (read_timeout)
+	else if ((!M_AXI_ARESETN && o_write_fault) || read_timeout)
 		o_read_fault <= 1;
 	else if (M_AXI_RVALID)
 	begin
 		if (faulty_read_return)
 			o_read_fault <= 1;
-		if (S_AXI_ARREADY)
+		if (!raddr_valid)
 			// It is a fault if we haven't issued an AR* request
 			// yet, and a value is returned
 			o_read_fault <= 1;
@@ -1042,7 +1080,7 @@ module axisafety #(
 		m_rvalid = r_rvalid;
 		m_rresp  = r_rresp;
 	end else begin
-		m_rvalid = M_AXI_RVALID && !S_AXI_ARREADY&& !faulty_read_return;
+		m_rvalid = M_AXI_RVALID && raddr_valid && !faulty_read_return;
 		m_rresp  = M_AXI_RRESP;
 	end
 
@@ -1097,6 +1135,59 @@ module axisafety #(
 	end
 
 
+	generate if (OPT_SELF_RESET)
+	begin
+		reg	[4:0]	reset_counter;
+		reg		reset_timeout, r_clear_fault;
+
+		initial	M_AXI_ARESETN = 0;
+		always @(posedge S_AXI_ACLK)
+		if (!S_AXI_ARESETN)
+			M_AXI_ARESETN <= 0;
+		else if (clear_fault)
+			M_AXI_ARESETN <= 1;
+		else if (o_read_fault || o_write_fault)
+			M_AXI_ARESETN <= 0;
+
+		initial	reset_counter = 0;
+		always @(posedge S_AXI_ACLK)
+		if (M_AXI_ARESETN)
+			reset_counter <= 0;
+		else if (!reset_timeout)
+			reset_counter <= reset_counter+1;
+
+		always @(*)
+			reset_timeout <= reset_counter[4];
+
+		initial	r_clear_fault <= 1;
+		always @(posedge S_AXI_ACLK)
+		if (!S_AXI_ARESETN)
+			r_clear_fault <= 1;
+		else if (!M_AXI_ARESETN && !reset_timeout)
+			r_clear_fault <= 0;
+		else if (!o_read_fault && !o_write_fault)
+			r_clear_fault <= 0;
+		else if (raddr_valid || waddr_valid)
+			r_clear_fault <= 0;
+		else
+			r_clear_fault <= 1;
+
+		always @(*)
+		if (S_AXI_AWVALID || S_AXI_ARVALID)
+			clear_fault = 0;
+		else if (raddr_valid || waddr_valid)
+			clear_fault = 0;
+		else
+			clear_fault = r_clear_fault;
+	
+	end else begin
+
+		always @(*)
+			M_AXI_ARESETN = S_AXI_ARESETN;
+		always @(*)
+			clear_fault = 0;
+
+	end endgenerate
 	//
 	//
 	//
@@ -1139,9 +1230,14 @@ module axisafety #(
 					f_axi_rdid_ckign_nbursts,
 					f_axi_rdid_ckign_outstanding;
 
+	reg	f_past_valid;
+	initial	f_past_valid = 0;
+	always @(posedge S_AXI_ACLK)
+		f_past_valid <= 1;
+
 	faxi_slave	#(
-		.F_AXI_MAXSTALL((F_OPT_FAULTLESS) ? 12 : 0),
-		.F_AXI_MAXDELAY(OPT_TIMEOUT+4),
+		.F_AXI_MAXSTALL((F_OPT_FAULTLESS) ? (OPT_TIMEOUT+2) : 0),
+		.F_AXI_MAXDELAY(OPT_TIMEOUT+5),
 		.F_AXI_MAXRSTALL(3),
 		.C_AXI_ID_WIDTH(C_S_AXI_ID_WIDTH),
 		.C_AXI_DATA_WIDTH(C_S_AXI_DATA_WIDTH),
@@ -1297,9 +1393,22 @@ module axisafety #(
 		assert(!S_AXI_AWREADY);
 		if (S_AXI_BVALID)
 			assert(f_axi_wr_pending == 0);
+		if (!o_write_fault && M_AXI_AWVALID)
+			assert(f_axi_wr_pending == M_AXI_AWLEN + 1
+					- (M_AXI_WVALID ? 1:0)
+					- (r_wvalid ? 1 : 0));
+		if (!o_write_fault && f_axi_wr_pending > 0)
+			assert((!M_AXI_WVALID || !M_AXI_WLAST)
+					&&(!r_wvalid || !r_wlast));
+		if (!o_write_fault && M_AXI_WVALID && M_AXI_WLAST)
+			assert(!r_wvalid || !r_wlast);
 	end else begin
 		assert(s_wbursts == 0);
-		assert(S_AXI_AWREADY);
+		assert(!S_AXI_WREADY);
+		if (OPT_SELF_RESET)
+			assert(1 || S_AXI_AWREADY || !M_AXI_ARESETN || !S_AXI_ARESETN);
+		else
+			assert(S_AXI_AWREADY);
 	end
 
 	always @(*)
@@ -1310,13 +1419,17 @@ module axisafety #(
 
 	//
 	// AWREADY will always be low mid-burst
-	always @(*)
-	if (f_axi_wr_pending > 0)
+	always @(posedge S_AXI_ACLK)
+	if (!f_past_valid || $past(!S_AXI_ARESETN))
+		assert(S_AXI_AWREADY == !OPT_SELF_RESET);
+	else if (f_axi_wr_pending > 0)
 		assert(!S_AXI_AWREADY);
 	else if (s_wbursts)
 		assert(!S_AXI_AWREADY);
-	else
+	else if (!OPT_SELF_RESET)
 		assert(S_AXI_AWREADY);
+	else if (!o_write_fault && !o_read_fault)
+		assert(S_AXI_AWREADY || OPT_SELF_RESET);
 
 	always @(*)
 	if (f_axi_wr_pending > 0)
@@ -1331,47 +1444,64 @@ module axisafety #(
 		assert(!M_AXI_AWVALID);
 
 	always @(*)
-	if (f_axi_awr_nbursts == 0)
+	if (M_AXI_ARESETN && (f_axi_awr_nbursts == 0))
 	begin
 		assert(o_write_fault || !M_AXI_AWVALID);
 		assert(!S_AXI_BVALID);
 		assert(s_wbursts == 0);
-	end else if (s_wbursts == 0)
+	end else if (M_AXI_ARESETN && s_wbursts == 0)
 		assert(f_axi_wr_pending > 0);
 
 	always @(*)
 	if (S_AXI_WREADY)
-		assert(!S_AXI_AWREADY);
+		assert(waddr_valid);
+	else if (f_axi_wr_pending > 0)
+	begin
+		if (!o_write_fault)
+			assert(M_AXI_WVALID && r_wvalid);
+	end
 
 	always @(*)
-	if (!o_write_fault && f_axi_wr_pending && !S_AXI_WREADY)
+	if (!OPT_SELF_RESET)
+		assert(waddr_valid == !S_AXI_AWREADY);
+	else begin
+		if (!last_sreset)
+			assert(waddr_valid == !S_AXI_AWREADY);
+		assert(waddr_valid == (f_axi_awr_nbursts > 0));
+	end
+
+	always @(*)
+	if (S_AXI_ARESETN && !o_write_fault && f_axi_wr_pending && !S_AXI_WREADY)
 		assert(M_AXI_WVALID);
 
 	always @(*)
-	if (!o_write_fault && m_wempty)
+	if (S_AXI_ARESETN && !o_write_fault && m_wempty)
 	begin
 		assert(M_AXI_AWVALID || !M_AXI_WVALID);
 		assert(M_AXI_AWVALID || f_axi_wr_pending == 0);
 	end
 
 	always @(*)
-	if (!o_write_fault && !M_AXI_AWVALID)
-		assert(f_axi_wr_pending + (M_AXI_WVALID ? 1:0) + (r_wvalid ? 1:0) == m_wpending);
-	else if (!o_write_fault)
+	if (S_AXI_ARESETN && M_AXI_AWVALID)
 	begin
-		assert(f_axi_wr_pending == M_AXI_AWLEN + 1 - (M_AXI_WVALID ? 1:0) - (r_wvalid ? 1:0));
-		assert(m_wpending == 0);
+		if (!o_write_fault && !M_AXI_AWVALID)
+			assert(f_axi_wr_pending + (M_AXI_WVALID ? 1:0) + (r_wvalid ? 1:0) == m_wpending);
+		else if (!o_write_fault)
+		begin
+			assert(f_axi_wr_pending == M_AXI_AWLEN + 1 - (M_AXI_WVALID ? 1:0) - (r_wvalid ? 1:0));
+			assert(m_wpending == 0);
+		end
 	end
 
 	always @(*)
 		assert(m_wpending <= 9'h100);
 
 	always @(*)
-	if ((!o_write_fault)&&(f_axi_awr_nbursts == 0))
+	if (M_AXI_ARESETN && (!o_write_fault)&&(f_axi_awr_nbursts == 0))
 		assert(!M_AXI_AWVALID);
 
 	always @(*)
-	if (!o_write_fault)
+	if (S_AXI_ARESETN && !o_write_fault)
 	begin
 		if (f_axi_awr_nbursts == 0)
 		begin
@@ -1379,8 +1509,11 @@ module axisafety #(
 			assert(!M_AXI_WVALID);
 		end
 
-		if ((f_axi_wr_pending > 0)&& M_AXI_AWVALID && !r_wvalid)
-			assert(f_axi_wr_pending == M_AXI_AWLEN + (M_AXI_WVALID ? 0:1));
+		if (!M_AXI_AWVALID)
+			assert(f_axi_wr_pending 
+					+(M_AXI_WVALID ? 1:0)
+					+ (r_wvalid ? 1:0)
+				== m_wpending);
 		if (f_axi_awr_nbursts == (S_AXI_BVALID ? 1:0))
 		begin
 			assert(!M_AXI_AWVALID);
@@ -1425,7 +1558,21 @@ module axisafety #(
 
 	always @(*)
 	if (write_timer > OPT_TIMEOUT)
-		assert(write_timeout);
+		assert(o_write_fault || write_timeout);
+
+	always @(*)
+	if (!OPT_SELF_RESET)
+		assert(waddr_valid == !S_AXI_AWREADY);
+	else if (waddr_valid)
+		assert(!S_AXI_AWREADY);
+
+	always @(*)
+	if (!o_write_fault && M_AXI_ARESETN)
+		assert(waddr_valid == !S_AXI_AWREADY);
+
+	always @(*)
+	if (f_axi_wr_pending == 0)
+		assert(!S_AXI_WREADY);
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -1439,6 +1586,8 @@ module axisafety #(
 	always @(*)
 		assert(f_axi_rd_nbursts <= 1);
 	always @(*)
+		assert(raddr_valid == (f_axi_rd_nbursts>0));
+	always @(*)
 	if (f_axi_rdid_nbursts > 0)
 		assert(rfifo_id == f_axi_rd_checkid);
 	else if (f_axi_rd_nbursts > 0)
@@ -1446,7 +1595,21 @@ module axisafety #(
 
 	always @(*)
 	if (f_axi_rd_nbursts > 0)
+		assert(raddr_valid);
+
+	always @(*)
+	if (raddr_valid)
 		assert(!S_AXI_ARREADY);
+
+	always @(*)
+	if (!OPT_SELF_RESET)
+		assert(raddr_valid == !S_AXI_ARREADY);
+	else begin
+		if (!last_sreset)
+			assert(raddr_valid == !S_AXI_ARREADY);
+		assert(raddr_valid == (f_axi_rd_nbursts > 0));
+	end
+
 	always @(*)
 	if (f_axi_rd_ckvalid)
 		assert(f_axi_rd_outstanding == f_axi_rd_cklen);
@@ -1461,7 +1624,7 @@ module axisafety #(
 
 	always @(*)
 	if (f_axi_rd_outstanding == 0)
-		assert(S_AXI_ARREADY);
+		assert(!raddr_valid || OPT_SELF_RESET);
 
 	always @(*)
 	if (!o_read_fault && S_AXI_ARREADY)
@@ -1497,6 +1660,29 @@ module axisafety #(
 	always @(*)
 	if (read_timer > OPT_TIMEOUT)
 		assert(read_timeout);
+
+
+	always @(posedge S_AXI_ACLK)
+	if (OPT_SELF_RESET && (!f_past_valid || !$past(M_AXI_ARESETN)))
+	begin
+		assume(!M_AXI_BVALID);
+		assume(!M_AXI_RVALID);
+	end
+
+	always @(*)
+	if (!o_read_fault && M_AXI_ARESETN)
+		assert(raddr_valid == !S_AXI_ARREADY);
+
+	always @(*)
+	if (f_axi_rd_nbursts > 0)
+		assert(raddr_valid);
+
+	always @(*)
+	if (S_AXI_ARESETN && OPT_SELF_RESET)
+	begin
+		if (!M_AXI_ARESETN)
+			assert(o_read_fault || o_write_fault || last_sreset);
+	end
 
 
 	////////////////////////////////////////////////////////////////////////
@@ -1556,7 +1742,7 @@ module axisafety #(
 			.F_LGDEPTH(F_LGDEPTH))
 		f_master(
 		.i_clk(S_AXI_ACLK),
-		.i_axi_reset_n(S_AXI_ARESETN),
+		.i_axi_reset_n(M_AXI_ARESETN),
 		//
 		// Address write channel
 		//
@@ -1649,15 +1835,27 @@ module axisafety #(
 		);
 
 		always @(*)
+		if (OPT_SELF_RESET)
+			assert(!o_write_fault || !M_AXI_ARESETN);
+		else
 			assert(!o_write_fault);
 
 		always @(*)
+		if (OPT_SELF_RESET)
+			assert(!o_read_fault || !M_AXI_ARESETN);
+		else
 			assert(!o_read_fault);
 
 		always @(*)
+		if (OPT_SELF_RESET)
+			assert(!read_timeout || !M_AXI_ARESETN);
+		else
 			assert(!read_timeout);
 
 		always @(*)
+		if (OPT_SELF_RESET)
+			assert(!write_timeout || !M_AXI_ARESETN);
+		else
 			assert(!write_timeout);
 
 		always @(*)
@@ -1678,21 +1876,21 @@ module axisafety #(
 		end
 
 		always @(*)
-		if (f_axi_rd_nbursts > 0)
+		if (M_AXI_ARESETN && f_axi_rd_nbursts > 0)
 			assert(f_axi_rd_nbursts == fm_axi_rd_nbursts
 				+ (M_AXI_ARVALID ? 1 : 0)
 				+ (r_rvalid&&m_rlast ? 1 : 0)
 				+ (S_AXI_RVALID&&S_AXI_RLAST ? 1 : 0));
 
 		always @(*)
-		if (f_axi_rd_outstanding > 0)
+		if (M_AXI_ARESETN && f_axi_rd_outstanding > 0)
 			assert(f_axi_rd_outstanding == fm_axi_rd_outstanding
 				+ (M_AXI_ARVALID ? M_AXI_ARLEN+1 : 0)
 				+ (r_rvalid ? 1 : 0)
 				+ (S_AXI_RVALID ? 1 : 0));
 
 		always @(*)
-		if (f_axi_rdid_outstanding > 0)
+		if (M_AXI_ARESETN && f_axi_rdid_outstanding > 0)
 		begin
 			if (M_AXI_ARVALID)
 				assert(rfifo_id == M_AXI_ARID);
@@ -1718,10 +1916,11 @@ module axisafety #(
 
 
 		always @(*)
+		if (S_AXI_ARESETN)
 			assert(m_wpending == fm_axi_wr_pending);
 
 		always @(*)
-		if (fm_axi_awr_nbursts > 0)
+		if (S_AXI_ARESETN && fm_axi_awr_nbursts > 0)
 		begin
 			assert(fm_axi_awr_nbursts== f_axi_awr_nbursts);
 			assert(fm_axi_awr_nbursts == 1);
@@ -1771,19 +1970,36 @@ module axisafety #(
 
 		always @(*)
 		if (f_axi_wr_pending > 0)
+		begin
 			assert(S_AXI_WREADY || M_AXI_WVALID);
+			assert(waddr_valid);
+		end
 
 		always @(*)
-		if (fm_axi_wr_pending > 0)
-			assert(fm_axi_wr_pending == (M_AXI_WVALID ? 1:0) + (r_wvalid ? 1:0) + f_axi_wr_pending);
-		else if (f_axi_wr_pending > 0)
-			assert(M_AXI_AWVALID);
+		if (M_AXI_ARESETN || !OPT_SELF_RESET)
+		begin
+			if (fm_axi_wr_pending > 0)
+				assert(fm_axi_wr_pending
+					== (M_AXI_WVALID ? 1:0)
+					+ (r_wvalid ? 1:0) + f_axi_wr_pending);
+			else if (f_axi_wr_pending > 0)
+				assert(M_AXI_AWVALID);
+		end
 
 		always @(*)
+		if (M_AXI_ARESETN || !OPT_SELF_RESET)
 			assert(f_axi_awr_nbursts
 				== (M_AXI_AWVALID ? 1:0) + (S_AXI_BVALID ? 1:0)
 					+ fm_axi_awr_nbursts);
 	end endgenerate
+
+	initial	last_sreset = 1;
+	initial	last_sreset_2 = 1;
+	always @(posedge S_AXI_ACLK)
+		{ last_sreset_2, last_sreset } <= { last_sreset, !S_AXI_ARESETN };
+	always @(*)
+	if (last_sreset && !last_sreset_2)
+		assume(!S_AXI_ARESETN);
 
 	////////////////////////////////////////////////////////////////
 	//
