@@ -42,7 +42,11 @@
 ################################################################################
 ##
 ##
-TESTS := wbarbiter wbm2axilite axilrd2wbsp axilwr2wbsp demoaxi axlite2wbsp wbxbar axilxbar wbp2classic demofull xlnxfull axisafety wbm2axisp # axim2wbsp
+CROSSBARS := axilxbar wbxbar axixbar
+BRIDGES := wbm2axilite axilrd2wbsp axilwr2wbsp axlite2wbsp wbp2classic wbc2pipeline wbm2axisp # axim2wbsp
+# Still worth writing an AXI 2 AXI-lite bridge
+AXISLAVES := demofull demoaxi xlnxfull axisafety
+TESTS := wbarbiter $(BRDIGES) $(CROSSBARS) $(AXISLAVES)
 .PHONY: $(TESTS)
 all: $(TESTS)
 RTL := ../../rtl
@@ -65,6 +69,7 @@ AXLITE     := axlite2wbsp
 XILINXDEMO := xlnxdemo
 XILINXFULL := xlnxfull_2018_3
 XLNXSTREAM := xlnxstream_2018_3
+AXIXBAR    := axixbar
 AXILXBAR   := axilxbar
 WBXBAR     := wbxbar
 WBXBAR4x8  := wbxbar4x8
@@ -182,6 +187,66 @@ $(AXI2WB)/PASS: $(RTL)/wbarbiter.v
 	echo "The AXI2WB bridge does not work yet, so I do not expect this one to pass"
 	echo sby -f $(AXI2WB).sby
 
+.PHONY: $(AXIXBAR) $(AXIXBAR)_prf $(AXIXBAR)_cvr
+$(AXIXBAR): $(AXIXBAR)_prf # $(AXIXBAR)_cvr
+$(AXIXBAR)_prf: $(AXIXBAR)_prf4x8_lpg/PASS
+$(AXIXBAR)_prf: $(AXIXBAR)_prf4x8_lin/PASS
+$(AXIXBAR)_prf: $(AXIXBAR)_prf4x8_lp/PASS
+$(AXIXBAR)_prf: $(AXIXBAR)_prf4x8/PASS
+$(AXIXBAR)_prf: $(AXIXBAR)_prf1x8_lp/PASS
+$(AXIXBAR)_prf: $(AXIXBAR)_prf1x8/PASS
+$(AXIXBAR)_prf: $(AXIXBAR)_prf4x1_lp/PASS
+$(AXIXBAR)_prf: $(AXIXBAR)_prf4x1/PASS
+#
+$(AXIXBAR)_cvr: $(AXIXBAR)_cvr3x3_lpg/PASS
+$(AXIXBAR)_cvr: $(AXIXBAR)_cvr3x3_lin/PASS
+$(AXIXBAR)_cvr: $(AXIXBAR)_cvr3x3_lp/PASS
+$(AXIXBAR)_cvr: $(AXIXBAR)_cvr3x3/PASS
+$(AXIXBAR)_cvr: $(AXIXBAR)_cvr1x3_lpg/PASS
+$(AXIXBAR)_cvr: $(AXIXBAR)_cvr1x3_lin/PASS
+$(AXIXBAR)_cvr: $(AXIXBAR)_cvr1x3_lp/PASS
+$(AXIXBAR)_cvr: $(AXIXBAR)_cvr1x3/PASS
+$(AXIXBAR)_cvr: $(AXIXBAR)_cvr4x1_lp/PASS
+$(AXIXBAR)_cvr: $(AXIXBAR)_cvr4x1/PASS
+
+$(AXIXBAR)_prf4x8_lpg/PASS: $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby prf4x8_lpg
+$(AXIXBAR)_prf4x8_lin/PASS:    $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby prf4x8_lin
+$(AXIXBAR)_prf4x8_lp/PASS: $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby prf4x8_lp
+$(AXIXBAR)_prf4x8/PASS:    $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby prf4x8
+$(AXIXBAR)_prf1x8_lp/PASS: $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby prf1x8_lp
+$(AXIXBAR)_prf1x8/PASS:    $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby prf1x8
+$(AXIXBAR)_prf4x1_lp/PASS: $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby prf4x1_lp
+$(AXIXBAR)_prf4x1/PASS:    $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby prf4x1
+
+$(AXIXBAR)_cvr3x3_lpg/PASS: $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby cvr3x3_lpg
+$(AXIXBAR)_cvr3x3_lin/PASS:    $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby cvr3x3_lin
+$(AXIXBAR)_cvr3x3_lp/PASS: $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby cvr3x3_lp
+$(AXIXBAR)_cvr3x3/PASS:    $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby cvr3x3
+$(AXIXBAR)_cvr1x3_lpg/PASS: $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby cvr1x3_lpg
+$(AXIXBAR)_cvr1x3_lin/PASS:    $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby cvr1x3_lin
+$(AXIXBAR)_cvr1x3_lp/PASS: $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby cvr1x3_lp
+$(AXIXBAR)_cvr1x3/PASS:    $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby cvr1x3
+$(AXIXBAR)_cvr4x1_lp/PASS: $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby cvr4x1_lp
+$(AXIXBAR)_cvr4x1/PASS:    $(RTL)/$(AXIXBAR).v $(AXIXBAR).sby $(AXI)
+	sby -f $(AXIXBAR).sby cvr4x1
+
 .PHONY: $(AXILXBAR) $(AXILXBAR)prf $(AXILXBAR)cvr
 $(AXILXBAR): $(AXILXBAR)prf $(AXILXBAR)cvr
 $(AXILXBAR)prf: $(AXILXBAR)_prf4x8_lp/PASS
@@ -223,157 +288,187 @@ $(AXILXBAR)_cvr4x1_lp/PASS: $(AXILXBAR).sby $(RTL)/$(AXILXBAR).v $(AXIL)
 
 
 .PHONY: $(WBXBAR) $(WBXBAR4x8) $(WBXBAR1x8) $(WBXBAR4x1)
+.PHONY: $(WBXBAR)_prf $(WBXBAR)_cvr
+.PHONY: $(WBXBAR4x8)_prf $(WBXBAR4x8)_cvr
+.PHONY: $(WBXBAR1x8)_prf $(WBXBAR1x8)_cvr
+.PHONY: $(WBXBAR4x1)_prf $(WBXBAR4x1)_cvr
 $(WBXBAR): $(WBXBAR4x8) $(WBXBAR1x8) $(WBXBAR4x1)
-$(WBXBAR4x8): wbxbar_prf4x8_buflp/PASS
+$(WBXBAR)_prf: $(WBXBAR4x8)_prf $(WBXBAR1x8)_prf $(WBXBAR4x1)_prf
+$(WBXBAR)_cvr: $(WBXBAR4x8)_cvr $(WBXBAR1x8)_cvr $(WBXBAR4x1)_cvr
+
+$(WBXBAR4x8): $(WBXBAR4x8)_prf $(WBXBAR4x8)_cvr
+$(WBXBAR1x8): $(WBXBAR1x8)_prf $(WBXBAR1x8)_cvr
+$(WBXBAR4x1): $(WBXBAR4x1)_prf $(WBXBAR4x1)_cvr
+
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_buflp/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_buf/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_lp/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_cheap/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_buflpko/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_bufko/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_lpko/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_cheapko/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_buflpkos/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_bufkos/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_lpkos/PASS
+$(WBXBAR4x8)_prf: wbxbar_prf4x8_cheapkos/PASS
+
 wbxbar_prf4x8_buflp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x8_buflp
-$(WBXBAR4x8): wbxbar_prf4x8_buf/PASS
 wbxbar_prf4x8_buf/PASS:      $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x8_buf
-$(WBXBAR4x8): wbxbar_prf4x8_lp/PASS
 wbxbar_prf4x8_lp/PASS:       $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x8_lp
-$(WBXBAR4x8): wbxbar_prf4x8_cheap/PASS
 wbxbar_prf4x8_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x8_cheap
 #
-$(WBXBAR4x8): wbxbar_cvr4x8_buflp/PASS
+wbxbar_prf4x8_buflpko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x8_buflpko
+wbxbar_prf4x8_bufko/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x8_bufko
+wbxbar_prf4x8_lpko/PASS:     $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x8_lpko
+wbxbar_prf4x8_cheapko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x8_cheapko
+wbxbar_prf4x8_buflpkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x8_buflpkos
+wbxbar_prf4x8_bufkos/PASS:   $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x8_bufkos
+wbxbar_prf4x8_lpkos/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x8_lpkos
+wbxbar_prf4x8_cheapkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x8_cheapkos
+
+#
+#
+$(WBXBAR4x8)_cvr: wbxbar_cvr4x8_buflp/PASS
+$(WBXBAR4x8)_cvr: wbxbar_cvr4x8_buf/PASS
+$(WBXBAR4x8)_cvr: wbxbar_cvr4x8_lp/PASS
+$(WBXBAR4x8)_cvr: wbxbar_cvr4x8_cheap/PASS
+#
 wbxbar_cvr4x8_buflp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr4x8_buflp
-$(WBXBAR4x8): wbxbar_cvr4x8_buf/PASS
 wbxbar_cvr4x8_buf/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr4x8_buf
-$(WBXBAR4x8): wbxbar_cvr4x8_lp/PASS
 wbxbar_cvr4x8_lp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr4x8_lp
-$(WBXBAR4x8): wbxbar_cvr4x8_cheap/PASS
 wbxbar_cvr4x8_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr4x8_cheap
 #
-$(WBXBAR4x8): wbxbar_prf4x8_buflpko/PASS
-wbxbar_prf4x8_buflpko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x8_buflpko
-$(WBXBAR4x8): wbxbar_prf4x8_bufko/PASS
-wbxbar_prf4x8_bufko/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x8_bufko
-$(WBXBAR4x8): wbxbar_prf4x8_lpko/PASS
-wbxbar_prf4x8_lpko/PASS:     $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x8_lpko
-$(WBXBAR4x8): wbxbar_prf4x8_cheapko/PASS
-wbxbar_prf4x8_cheapko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x8_cheapko
-$(WBXBAR4x8): wbxbar_prf4x8_buflpkos/PASS
-wbxbar_prf4x8_buflpkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x8_buflpkos
-$(WBXBAR4x8): wbxbar_prf4x8_bufkos/PASS
-wbxbar_prf4x8_bufkos/PASS:   $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x8_bufkos
-$(WBXBAR4x8): wbxbar_prf4x8_lpkos/PASS
-wbxbar_prf4x8_lpkos/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x8_lpkos
-$(WBXBAR4x8): wbxbar_prf4x8_cheapkos/PASS
-wbxbar_prf4x8_cheapkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x8_cheapkos
-$(WBXBAR1x8): wbxbar_prf1x8_buflp/PASS
+#
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_buflp/PASS
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_buf/PASS
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_lp/PASS
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_cheap/PASS
+#
+
 wbxbar_prf1x8_buflp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_buflp
-$(WBXBAR1x8): wbxbar_prf1x8_buf/PASS
 wbxbar_prf1x8_buf/PASS:      $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_buf
-$(WBXBAR1x8): wbxbar_prf1x8_lp/PASS
 wbxbar_prf1x8_lp/PASS:       $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_lp
-$(WBXBAR1x8): wbxbar_prf1x8_cheap/PASS
 wbxbar_prf1x8_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_cheap
 #
-$(WBXBAR1x8): wbxbar_cvr1x3_buflp/PASS
+#
+$(WBXBAR1x8)_cvr: wbxbar_cvr1x3_buflp/PASS
+$(WBXBAR1x8)_cvr: wbxbar_cvr1x3_buf/PASS
+$(WBXBAR1x8)_cvr: wbxbar_cvr1x3_lp/PASS
+$(WBXBAR1x8)_cvr: wbxbar_cvr1x3_cheap/PASS
+#
 wbxbar_cvr1x3_buflp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr1x3_buflp
-$(WBXBAR1x8): wbxbar_cvr1x3_buf/PASS
 wbxbar_cvr1x3_buf/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr1x3_buf
-$(WBXBAR1x8): wbxbar_cvr1x3_lp/PASS
 wbxbar_cvr1x3_lp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr1x3_lp
-$(WBXBAR1x8): wbxbar_cvr1x3_cheap/PASS
 wbxbar_cvr1x3_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr1x3_cheap
 #
-$(WBXBAR1x8): wbxbar_prf1x8_buflpko/PASS
+#
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_buflpko/PASS
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_bufko/PASS
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_lpko/PASS
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_cheapko/PASS
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_buflpkos/PASS
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_bufkos/PASS
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_lpkos/PASS
+$(WBXBAR1x8)_prf: wbxbar_prf1x8_cheapkos/PASS
+#
 wbxbar_prf1x8_buflpko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_buflpko
-$(WBXBAR1x8): wbxbar_prf1x8_bufko/PASS
 wbxbar_prf1x8_bufko/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_bufko
-$(WBXBAR1x8): wbxbar_prf1x8_lpko/PASS
 wbxbar_prf1x8_lpko/PASS:     $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_lpko
-$(WBXBAR1x8): wbxbar_prf1x8_cheapko/PASS
 wbxbar_prf1x8_cheapko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_cheapko
-$(WBXBAR1x8): wbxbar_prf1x8_buflpkos/PASS
 wbxbar_prf1x8_buflpkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_buflpkos
-$(WBXBAR1x8): wbxbar_prf1x8_bufkos/PASS
 wbxbar_prf1x8_bufkos/PASS:   $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_bufkos
-$(WBXBAR1x8): wbxbar_prf1x8_lpkos/PASS
 wbxbar_prf1x8_lpkos/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_lpkos
-$(WBXBAR1x8): wbxbar_prf1x8_cheapkos/PASS
 wbxbar_prf1x8_cheapkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf1x8_cheapkos
-$(WBXBAR4x1): wbxbar_prf4x1_buflp/PASS
+#
+#
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_buflp/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_buf/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_lp/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_cheap/PASS
+#
 wbxbar_prf4x1_buflp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x1_buflp
-$(WBXBAR4x1): wbxbar_prf4x1_buf/PASS
 wbxbar_prf4x1_buf/PASS:      $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x1_buf
-$(WBXBAR4x1): wbxbar_prf4x1_lp/PASS
 wbxbar_prf4x1_lp/PASS:       $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x1_lp
-$(WBXBAR4x1): wbxbar_prf4x1_cheap/PASS
 wbxbar_prf4x1_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby prf4x1_cheap
 #
-$(WBXBAR4x1): wbxbar_cvr4x1_buflp/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_buflpko/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_bufko/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_lpko/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_cheapko/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_buflpkos/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_bufkos/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_lpkos/PASS
+$(WBXBAR4x1)_prf: wbxbar_prf4x1_cheapkos/PASS
+#
+wbxbar_prf4x1_buflpko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x1_buflpko
+wbxbar_prf4x1_bufko/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x1_bufko
+wbxbar_prf4x1_lpko/PASS:     $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x1_lpko
+wbxbar_prf4x1_cheapko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x1_cheapko
+wbxbar_prf4x1_buflpkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x1_buflpkos
+wbxbar_prf4x1_bufkos/PASS:   $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x1_bufkos
+wbxbar_prf4x1_lpkos/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x1_lpkos
+wbxbar_prf4x1_cheapkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
+	sby -f $(WBXBAR).sby prf4x1_cheapkos
+#
+$(WBXBAR4x1)_cvr: wbxbar_cvr4x1_buflp/PASS
+$(WBXBAR4x1)_cvr: wbxbar_cvr4x1_buf/PASS
+$(WBXBAR4x1)_cvr: wbxbar_cvr4x1_lp/PASS
+$(WBXBAR4x1)_cvr: wbxbar_cvr4x1_cheap/PASS
+#
 wbxbar_cvr4x1_buflp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr4x1_buflp
-$(WBXBAR4x1): wbxbar_cvr4x1_buf/PASS
 wbxbar_cvr4x1_buf/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr4x1_buf
-$(WBXBAR4x1): wbxbar_cvr4x1_lp/PASS
 wbxbar_cvr4x1_lp/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr4x1_lp
-$(WBXBAR4x1): wbxbar_cvr4x1_cheap/PASS
 wbxbar_cvr4x1_cheap/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
 	sby -f $(WBXBAR).sby cvr4x1_cheap
 #
-$(WBXBAR4x1): wbxbar_prf4x1_buflpko/PASS
-wbxbar_prf4x1_buflpko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x1_buflpko
-$(WBXBAR4x1): wbxbar_prf4x1_bufko/PASS
-wbxbar_prf4x1_bufko/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x1_bufko
-$(WBXBAR4x1): wbxbar_prf4x1_lpko/PASS
-wbxbar_prf4x1_lpko/PASS:     $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x1_lpko
-$(WBXBAR4x1): wbxbar_prf4x1_cheapko/PASS
-wbxbar_prf4x1_cheapko/PASS:  $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x1_cheapko
-$(WBXBAR4x1): wbxbar_prf4x1_buflpkos/PASS
-wbxbar_prf4x1_buflpkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x1_buflpkos
-$(WBXBAR4x1): wbxbar_prf4x1_bufkos/PASS
-wbxbar_prf4x1_bufkos/PASS:   $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x1_bufkos
-$(WBXBAR4x1): wbxbar_prf4x1_lpkos/PASS
-wbxbar_prf4x1_lpkos/PASS:    $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x1_lpkos
-$(WBXBAR4x1): wbxbar_prf4x1_cheapkos/PASS
-wbxbar_prf4x1_cheapkos/PASS: $(WBXBAR).sby $(RTL)/$(WBXBAR).v $(WB)
-	sby -f $(WBXBAR).sby prf4x1_cheapkos
+#
 
 .PHONY: $(WBP2CLASSIC)
 $(WBP2CLASSIC): $(WBP2CLASSIC)_prf/PASS $(WBP2CLASSIC)_cvr/PASS
@@ -425,13 +520,19 @@ $(DEMOFULL)_prf256/PASS: $(DEMOFULL).sby $(RTL)/$(DEMOFULL).v $(AXI) $(RTL)/axi_
 	sby -f $(DEMOFULL).sby prfn256
 
 .PHONY: $(AXISAFETY)
-$(AXISAFETY): $(AXISAFETY)_prf/PASS $(AXISAFETY)_fault/PASS $(AXISAFETY)_cvr/PASS
+$(AXISAFETY): $(AXISAFETY)_prf/PASS   $(AXISAFETY)_prfr/PASS
+$(AXISAFETY): $(AXISAFETY)_fault/PASS $(AXISAFETY)_faultr/PASS
+$(AXISAFETY): $(AXISAFETY)_cvr/PASS
 $(AXISAFETY)_prf/PASS:   $(AXISAFETY).sby $(RTL)/$(AXISAFETY).v $(AXI)
 	sby -f $(AXISAFETY).sby prf
 $(AXISAFETY)_fault/PASS: $(AXISAFETY).sby $(RTL)/$(AXISAFETY).v $(AXI)
 	sby -f $(AXISAFETY).sby fault
 $(AXISAFETY)_cvr/PASS:   $(AXISAFETY).sby $(RTL)/$(AXISAFETY).v $(AXI)
 	sby -f $(AXISAFETY).sby cvr
+$(AXISAFETY)_prfr/PASS:   $(AXISAFETY).sby $(RTL)/$(AXISAFETY).v $(AXI)
+	sby -f $(AXISAFETY).sby prfr
+$(AXISAFETY)_faultr/PASS:   $(AXISAFETY).sby $(RTL)/$(AXISAFETY).v $(AXI)
+	sby -f $(AXISAFETY).sby faultr
 
 .PHONY: clean
 clean:
