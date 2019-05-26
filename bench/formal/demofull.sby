@@ -34,6 +34,7 @@ smtbmc boolector
 
 [script]
 read -formal demofull.v
+read -sv skidbuffer.v
 read -formal faxi_valaddr.v
 read -formal faxi_wstrb.v
 read -formal faxi_slave.v
@@ -56,6 +57,7 @@ prep -top demofull
 [files]
 ../../rtl/demofull.v
 ../../rtl/axi_addr.v
+../../rtl/skidbuffer.v
 faxi_slave.v
 faxi_addr.v
 faxi_wstrb.v

@@ -5,14 +5,16 @@
 // Project:	Pipelined Wishbone to AXI converter
 //
 // Purpose:	Demonstrate a formally verified AXI4 core with a (basic)
-//		interface.
+//		interface.  This interface is explained below.
 //
-// Performance: This core has been designed for a throughput approaching
-//		one beat per clock cycle.  The read channel can achieve this,
-//	although it means overlapping reads by a beat.  (One beat for the
-//	address, the next beat(s) have the data.)  The write channel can
-//	achieve this within a burst, but otherwise requires a minimum of
-//	2+AWLEN cycles per transaction of (1+AWLEN) beats.
+// Performance: This core has been designed for a total throughput of one beat
+//		per clock cycle.  Both read and write channels can achieve
+//	this.  The write channel will also introduce two clocks of latency,
+//	assuming no other latency from the master.  This means it will take
+//	a minimum of 3+AWLEN clock cycles per transaction of (1+AWLEN) beats,
+//	including both address and acknowledgment cycles.  The read channel
+//	will introduce a single clock of latency, requiring 2+ARLEN cycles
+//	per transaction of 1+ARLEN beats.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -61,7 +63,7 @@ module demofull #(
 		//	always @(posedge S_AXI_ACLK)
 		//	if (o_we)
 		//	begin
-		//	    for(k=0; k<C_S_AXI_DATA_WIDTH; k=k+1)
+		//	    for(k=0; k<C_S_AXI_DATA_WIDTH/8; k=k+1)
 		//	    begin
 		//		if (o_wstrb[k])
 		//		mem[o_waddr[AW-1:LSB][k*8+:8] <= o_wdata[k*8+:8]
@@ -243,13 +245,37 @@ module demofull #(
 
 	// Vivado will warn about wlen only using 4-bits.  This is
 	// to be expected, since the axi_addr module only needs to use
-	// the bottom four bits of rlen to determine address increments
+	// the bottom four bits of wlen to determine address increments
 	reg	[7:0]		wlen;
 	// Vivado will also warn about the top bit of wsize being unused.
 	// This is also to be expected for a DATA_WIDTH of 32-bits.
 	reg	[2:0]		wsize;
 	reg	[1:0]		wburst;
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Skid buffer
+	//
+	wire			m_awvalid;
+	reg			m_awready;
+	wire	[AW-1:0]	m_awaddr;
+	wire	[1:0]		m_awburst;
+	wire	[2:0]		m_awsize;
+	wire	[7:0]		m_awlen;
+	wire	[IW-1:0]	m_awid;
+	//
+	skidbuffer #(.DW(AW+2+3+8+IW))
+		awbuf(S_AXI_ACLK, !S_AXI_ARESETN,
+		S_AXI_AWVALID, S_AXI_AWREADY,
+			{ S_AXI_AWADDR, S_AXI_AWBURST, S_AXI_AWSIZE,
+					S_AXI_AWLEN, S_AXI_AWID },
+		m_awvalid, m_awready,
+			{ m_awaddr, m_awburst, m_awsize, m_awlen, m_awid });
+
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Write processing
+	//
 
 	wire	[AW-1:0]	next_rd_addr;
 	reg	[IW-1:0]	axi_rid;
@@ -262,28 +288,33 @@ module demofull #(
 	begin
 		axi_awready  <= 1;
 		axi_wready   <= 0;
-	end else if (S_AXI_AWVALID && S_AXI_AWREADY)
+	end else if (m_awvalid && m_awready)
 	begin
 		axi_awready <= 0;
 		axi_wready <= 1;
-		waddr    <= S_AXI_AWADDR;
-		wburst   <= S_AXI_AWBURST;
-		wsize    <= S_AXI_AWSIZE;
-		wlen     <= S_AXI_AWLEN;
 	end else if (S_AXI_WVALID && S_AXI_WREADY)
 	begin
-		waddr <= next_wr_addr;
 		axi_awready <= (S_AXI_WLAST)&&(!S_AXI_BVALID || S_AXI_BREADY);
 		axi_wready  <= (!S_AXI_WLAST);
-	end else if (!S_AXI_AWREADY)
+	end else if (!axi_awready)
 	begin
 		if (S_AXI_WREADY)
 			axi_awready <= 1'b0;
-		else if ((r_bvalid)&&(S_AXI_BVALID&&!S_AXI_BREADY))
+		else if ( r_bvalid && !S_AXI_BREADY)
 			axi_awready <= 1'b0;
 		else
 			axi_awready <= 1'b1;
 	end
+
+	always @(posedge S_AXI_ACLK)
+	if (m_awready)
+	begin
+		waddr    <= m_awaddr;
+		wburst   <= m_awburst;
+		wsize    <= m_awsize;
+		wlen     <= m_awlen;
+	end else if (S_AXI_WVALID)
+		waddr <= next_wr_addr;
 
 	axi_addr #(.AW(AW), .DW(DW))
 		get_next_wr_addr(waddr, wsize, wburst, wlen,
@@ -309,8 +340,8 @@ module demofull #(
 
 	always @(posedge S_AXI_ACLK)
 	begin
-		if (S_AXI_AWVALID && S_AXI_AWREADY)
-			r_bid    <= S_AXI_AWID;
+		if (m_awready)
+			r_bid    <= m_awid;
 
 		if (!S_AXI_BVALID || S_AXI_BREADY)
 			axi_bid <= r_bid;
@@ -322,9 +353,34 @@ module demofull #(
 		axi_bvalid <= 0;
 	else if (S_AXI_WVALID && S_AXI_WREADY && S_AXI_WLAST)
 		axi_bvalid <= 1;
-	else if (S_AXI_BVALID && S_AXI_BREADY)
+	else if (S_AXI_BREADY)
 		axi_bvalid <= r_bvalid;
 
+	always @(*)
+	begin
+		m_awready = axi_awready;
+		if (S_AXI_WVALID && S_AXI_WREADY && S_AXI_WLAST
+			&& (!S_AXI_BVALID || S_AXI_BREADY))
+			m_awready = 1;
+	end
+
+	// At one time, axi_awready was the same as S_AXI_AWREADY.  Now, though,
+	// with the extra write address skid buffer, this is no longer the case.
+	// S_AXI_AWREADY is handled/created/managed by the skid buffer.
+	//
+	// assign S_AXI_AWREADY = axi_awready;
+	//
+	// The rest of these signals can be set according to their registered
+	// values above.
+	assign	S_AXI_WREADY  = axi_wready;
+	assign	S_AXI_BVALID  = axi_bvalid;
+	assign	S_AXI_BID     = axi_bid;
+	//
+	// This core does not produce any bus errors, nor does it support
+	// exclusive access, so 2'b00 will always be the correct response.
+	assign	S_AXI_BRESP = 0;
+
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Read half
 	//
@@ -343,7 +399,6 @@ module demofull #(
 	reg	[AW-1:0]	raddr;
 
 	initial axi_arready = 1;
-	initial axi_rlen    = 0;
 	initial axi_rlast   = 0;
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
@@ -363,14 +418,48 @@ module demofull #(
 	else if (S_AXI_ARVALID && S_AXI_ARREADY)
 		axi_rlen <= (S_AXI_ARLEN+1)
 				+ ((S_AXI_RVALID && !S_AXI_RREADY) ? 1:0);
-	else if (S_AXI_RREADY && axi_rlen > 0)
+	else if (S_AXI_RREADY && S_AXI_RVALID)
 		axi_rlen <= axi_rlen - 1;
 
 	always @(posedge S_AXI_ACLK)
-	if (S_AXI_ARVALID && S_AXI_ARREADY)
-		raddr <= S_AXI_ARADDR;
-	else if (o_rd)
+	if (o_rd)
 		raddr <= next_rd_addr;
+	else if (S_AXI_ARREADY)
+		raddr <= S_AXI_ARADDR;
+
+	always @(posedge S_AXI_ACLK)
+	if (S_AXI_ARREADY)
+	begin
+		rburst   <= S_AXI_ARBURST;
+		rsize    <= S_AXI_ARSIZE;
+		rlen     <= S_AXI_ARLEN;
+		rid      <= S_AXI_ARID;
+	end
+
+	axi_addr #(.AW(AW), .DW(DW))
+		get_next_rd_addr((S_AXI_ARREADY ? S_AXI_ARADDR : raddr),
+				(S_AXI_ARREADY ? S_AXI_ARSIZE  : rsize),
+				(S_AXI_ARBURST ? S_AXI_ARBURST : rburst),
+				(S_AXI_ARLEN   ? S_AXI_ARLEN   : rlen),
+				next_rd_addr);
+
+	initial	axi_rvalid = 0;
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_ARESETN)
+		axi_rvalid <= 0;
+	else if (o_rd)
+		axi_rvalid <= 1;
+	else if (S_AXI_RREADY)
+		axi_rvalid <= 0;
+
+	always @(posedge S_AXI_ACLK)
+	if (!S_AXI_RVALID || S_AXI_RREADY)
+	begin
+		if (S_AXI_ARVALID && S_AXI_ARREADY)
+			axi_rid <= S_AXI_ARID;
+		else
+			axi_rid <= rid;
+	end
 
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_RVALID || S_AXI_RREADY)
@@ -383,33 +472,6 @@ module demofull #(
 			axi_rlast <= (axi_rlen == 1);
 	end
 
-	always @(posedge S_AXI_ACLK)
-	if (S_AXI_ARVALID && S_AXI_ARREADY)
-	begin
-		rburst   <= S_AXI_ARBURST;
-		rsize    <= S_AXI_ARSIZE;
-		rlen     <= S_AXI_ARLEN;
-		rid      <= S_AXI_ARID;
-	end
-
-	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_RVALID || S_AXI_RREADY)
-	begin
-		if (S_AXI_ARVALID && S_AXI_ARREADY)
-			axi_rid <= S_AXI_ARID;
-		else
-			axi_rid <= rid;
-	end
-
-	axi_addr #(.AW(AW), .DW(DW))
-		get_next_rd_addr(raddr, rsize, rburst, rlen, next_rd_addr);
-
-	initial	axi_rvalid = 0;
-	always @(posedge S_AXI_ACLK)
-	if (!S_AXI_ARESETN)
-		axi_rvalid <= 0;
-	else if (!S_AXI_RVALID || S_AXI_RREADY)
-		axi_rvalid <= o_rd;
 
 	always @(*)
 	begin
@@ -422,13 +484,6 @@ module demofull #(
 	always @(*)
 		axi_rdata = i_rdata;
 
-
-	assign	S_AXI_BRESP = 0;
-	//
-	assign	S_AXI_AWREADY = axi_awready;
-	assign	S_AXI_WREADY  = axi_wready;
-	assign	S_AXI_BVALID  = axi_bvalid;
-	assign	S_AXI_BID     = axi_bid;
 	//
 	assign	S_AXI_ARREADY = axi_arready;
 	assign	S_AXI_RVALID  = axi_rvalid;
@@ -498,17 +553,17 @@ module demofull #(
 		//
 		// Address write channel
 		//
-		.i_axi_awid(S_AXI_AWID),
-		.i_axi_awaddr(S_AXI_AWADDR),
-		.i_axi_awlen(S_AXI_AWLEN),
-		.i_axi_awsize(S_AXI_AWSIZE),
-		.i_axi_awburst(S_AXI_AWBURST),
-		.i_axi_awlock(S_AXI_AWLOCK),
-		.i_axi_awcache(S_AXI_AWCACHE),
-		.i_axi_awprot(S_AXI_AWPROT),
-		.i_axi_awqos(S_AXI_AWQOS),
-		.i_axi_awvalid(S_AXI_AWVALID),
-		.i_axi_awready(S_AXI_AWREADY),
+		.i_axi_awid(    m_awid),
+		.i_axi_awaddr( m_awaddr),
+		.i_axi_awlen(  m_awlen),
+		.i_axi_awsize( m_awsize),
+		.i_axi_awburst(m_awburst),
+		.i_axi_awlock( 1'b0),
+		.i_axi_awcache(4'h0),
+		.i_axi_awprot( 3'h0),
+		.i_axi_awqos(  4'h0),
+		.i_axi_awvalid(m_awvalid),
+		.i_axi_awready(m_awready),
 	//
 	//
 		//
@@ -623,6 +678,21 @@ module demofull #(
 		.f_axi_rdid_ckign_outstanding(f_axi_rdid_ckign_outstanding)
 	);
 
+	always @(posedge S_AXI_ACLK)
+	if (!f_past_valid || !$past(S_AXI_ARESETN))
+		assume(!S_AXI_AWVALID);
+	else if($past(S_AXI_ARESETN)&&($past(S_AXI_AWVALID && !S_AXI_AWREADY)))
+	begin
+		assume(S_AXI_AWVALID);
+		assume($stable(S_AXI_AWID));
+		assume($stable(S_AXI_AWADDR));
+		assume($stable(S_AXI_AWLEN));
+		assume($stable(S_AXI_AWSIZE));
+		assume($stable(S_AXI_AWBURST));
+	end
+
+	//
+
 	////////////////////////////////////////////////////////////////////////
 	//
 	// Write induction properties
@@ -660,9 +730,9 @@ module demofull #(
 
 	always @(*)
 	if ((f_axi_wr_pending > 0)||(r_bvalid))
-		assert(!S_AXI_AWREADY);
+		assert(1 || !axi_awready);
 	else
-		assert(S_AXI_AWREADY);
+		assert(axi_awready);
 
 	always @(*)
 	if (f_axi_wr_pending > 0)
@@ -674,8 +744,12 @@ module demofull #(
 	end
 
 	always @(*)
-	if (S_AXI_AWREADY)
+	if (axi_awready)
 		assert(!S_AXI_WREADY);
+
+	always @(*)
+	if (m_awready && !axi_awready)
+		assert(f_axi_awr_nbursts == 1 + (S_AXI_BVALID ? 1:0));
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -690,6 +764,10 @@ module demofull #(
 	always @(*)
 		assert(f_axi_rd_nbursts <= 2);
 	always @(*)
+	if (f_axi_rd_nbursts == 2)
+		assert(S_AXI_RVALID && S_AXI_RLAST && !S_AXI_ARREADY);
+
+	always @(*)
 		assert(axi_rlen == f_axi_rd_outstanding);
 	always @(*)
 	if (f_axi_rd_nbursts>0)
@@ -702,8 +780,7 @@ module demofull #(
 	always @(*)
 	if (f_axi_rdid_nbursts == 2)
 	begin
-		assert(S_AXI_RVALID && S_AXI_RLAST &&
-			(S_AXI_RID == f_axi_rd_checkid));
+		assert(S_AXI_RID == f_axi_rd_checkid);
 		assert(axi_rid == f_axi_rd_checkid);
 	end else if (f_axi_rdid_nbursts == 1)
 	begin
@@ -733,23 +810,38 @@ module demofull #(
 	always @(*)
 	if (f_axi_rd_ckvalid)
 		assert(f_axi_rd_outstanding == f_axi_rd_cklen);
+
 	always @(*)
 	if (S_AXI_ARREADY)
+	begin
 		assert(f_axi_rd_outstanding <= 1);
+		assert(!S_AXI_RVALID || S_AXI_RLAST);
+	end
+
 	always @(posedge S_AXI_ACLK)
-	if (S_AXI_ARREADY && S_AXI_ARVALID)
-		f_mem_rdaddr <= S_AXI_ARADDR;
-	else if (o_rd)
-		f_mem_rdaddr <= raddr;
+	if (o_rd)
+	begin
+		f_mem_rdaddr[AW-1:LSB] <= o_raddr;
+		if (LSB > 0)
+		begin
+			if (S_AXI_ARREADY)
+				f_mem_rdaddr[LSB-1:0] <= S_AXI_ARADDR[LSB-1:0];
+			else
+				f_mem_rdaddr[LSB-1:0] <= raddr[LSB-1:0];
+		end
+	end
 
 	faxi_addr #(.AW(C_S_AXI_ADDR_WIDTH))
-		get_next_rdaddr(f_mem_rdaddr, rsize,
-			rburst, rlen,
+		get_next_rdaddr(S_AXI_ARREADY ? S_AXI_ARADDR : raddr,
+			(S_AXI_ARREADY ? S_AXI_ARSIZE : rsize),
+			(S_AXI_ARREADY ? S_AXI_ARBURST: rburst),
+			(S_AXI_ARREADY ? S_AXI_ARLEN  : rlen),
 			f_next_rd_incr, f_next_rd_addr);
 
 	always @(posedge S_AXI_ACLK)
-	if (f_axi_rd_nbursts>0)
+	if (f_axi_rd_nbursts>1)
 		assert(rburst != 2'b11);
+
 	always @(posedge S_AXI_ACLK)
 	if (S_AXI_ARESETN && f_axi_rd_ckvalid && f_axi_rdid_ckign_nbursts==0)
 	begin
@@ -837,9 +929,6 @@ module demofull #(
 				o_wdata[byte_lane*8 +; 8];
 	end
 	*/
-	(* keep *) reg flag;
-	always @(posedge S_AXI_ACLK)
-		flag <= o_rd && (o_raddr == f_const_addr[AW-1:LSB]);
 	always @(posedge S_AXI_ACLK)
 	if (S_AXI_ARESETN
 		&& $past(o_rd)
@@ -868,8 +957,8 @@ module demofull #(
 		f_wr_cvr_valid <= 1;
 
 	always @(*)
-		cover(!S_AXI_BVALID && S_AXI_AWREADY &&
-				f_wr_cvr_valid && (f_axi_awr_nbursts == 0));
+		cover(!S_AXI_BVALID && axi_awready && !m_awvalid
+			&& f_wr_cvr_valid && (f_axi_awr_nbursts == 0));	//!!
 
 	reg	f_rd_cvr_valid;
 	initial	f_rd_cvr_valid = 0;
@@ -900,10 +989,16 @@ module demofull #(
 	end
 
 	always @(*)
-		cover(!S_AXI_ARESETN && (f_dbl_wr_count > 3)
+		cover(S_AXI_ARESETN && (f_dbl_wr_count > 1));	//!
+
+	always @(*)
+		cover(S_AXI_ARESETN && (f_dbl_wr_count > 3));	//!
+
+	always @(*)
+		cover(S_AXI_ARESETN && (f_dbl_wr_count > 3) && !m_awvalid
 			&&(!S_AXI_AWVALID && !S_AXI_WVALID && !S_AXI_BVALID)
 			&& (f_axi_awr_nbursts == 0)
-			&& (f_axi_wr_pending == 0));
+			&& (f_axi_wr_pending == 0));	//!!
 
 	initial	f_dbl_rd_count = 0;
 	always @(posedge S_AXI_ACLK)
