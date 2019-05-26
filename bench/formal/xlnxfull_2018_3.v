@@ -1029,9 +1029,9 @@ module xlnxfull_2018_3 #(
 	// BUG #1: The ID inputs, both ARID and AWID, are not registered.
 	// 	As a result, if the master changes these values mid burst,
 	//	the slave will return the wrong ID values
-	always @(*)
-		assume((S_AXI_ARID == f_axi_rd_checkid)
-			==(f_axi_rdid_nbursts > 0));
+	// always @(*)
+	//	assume((S_AXI_ARID == f_axi_rd_checkid)
+	//		==(f_axi_rdid_nbursts > 0));
 
 	always @(*)
 	if (f_axi_wr_pending > 0)
