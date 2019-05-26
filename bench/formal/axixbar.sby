@@ -28,7 +28,7 @@ cvr4x1      cvr nxo
 
 [options]
 ~cvr: mode prove
-~cvr: depth 2
+~cvr: depth 3
 cvr:  mode cover
 cvr:  depth 23
 

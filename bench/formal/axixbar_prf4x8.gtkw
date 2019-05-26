@@ -1,21 +1,21 @@
 [*]
-[*] GTKWave Analyzer v3.3.66 (w)1999-2015 BSI
-[*] Mon Apr 29 18:28:28 2019
+[*] GTKWave Analyzer v3.3.98 (w)1999-2018 BSI
+[*] Thu May 16 20:49:25 2019
 [*]
-[dumpfile] "/home/dan/work/rnd/opencores/wb2axip/trunk/bench/formal/axixbar_prf4x8/engine_0/trace_induct.vcd"
-[dumpfile_mtime] "Mon Apr 29 17:35:56 2019"
-[dumpfile_size] 985146
+[dumpfile] "/home/dan/work/rnd/opencores/wb2axip/trunk/bench/formal/axixbar_prf4x1/engine_0/trace_induct.vcd"
+[dumpfile_mtime] "Thu May 16 20:22:41 2019"
+[dumpfile_size] 164633
 [savefile] "/home/dan/work/rnd/opencores/wb2axip/trunk/bench/formal/axixbar_prf4x8.gtkw"
 [timestart] 0
-[size] 1918 1021
-[pos] -1 -1
+[size] 1918 976
+[pos] -1 -8
 *-3.980494 220 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] axixbar.
 [treeopen] axixbar.CHECK_SLAVES<0>.
 [sst_width] 270
 [signals_width] 302
 [sst_expanded] 1
-[sst_vpaned_height] 290
+[sst_vpaned_height] 276
 @28
 axixbar.S_AXI_ACLK
 axixbar.S_AXI_ARESETN
@@ -49,10 +49,8 @@ axixbar.M_AXI_AWQOS[15:0]
 @22
 [color] 3
 axixbar.M_AXI_WVALID[3:0]
-@23
 [color] 2
 axixbar.M_AXI_WREADY[3:0]
-@22
 [color] 3
 axixbar.M_AXI_WDATA[127:0]
 [color] 3
@@ -83,8 +81,6 @@ axixbar.M_AXI_ARVALID[3:0]
 axixbar.M_AXI_ARREADY[3:0]
 [color] 3
 axixbar.M_AXI_ARID[7:0]
-[color] 3
-axixbar.M_AXI_ARADDR[127:0]
 [color] 6
 axixbar.M_AXI_ARLEN[31:0]
 [color] 3
@@ -116,200 +112,139 @@ axixbar.M_AXI_RRESP[7:0]
 axixbar.M_AXI_RLAST[3:0]
 @1000200
 -Master reads
-@22
-axixbar.w_mrpending<0>[8:0]
-axixbar.w_mrpending<1>[8:0]
-axixbar.w_mrpending<2>[8:0]
-axixbar.w_mrpending<3>[8:0]
 @200
 -
 @800200
 -Slave writes
+@28
+[color] 2
+axixbar.S_AXI_AWVALID
+[color] 3
+axixbar.S_AXI_AWREADY
+[color] 2
+axixbar.S_AXI_AWID[1:0]
 @22
 [color] 2
-axixbar.S_AXI_AWVALID[7:0]
-[color] 3
-axixbar.S_AXI_AWREADY[7:0]
-[color] 2
-axixbar.S_AXI_AWID[15:0]
-[color] 2
-axixbar.S_AXI_AWADDR[255:0]
+axixbar.S_AXI_AWADDR[15:0]
 [color] 6
-axixbar.S_AXI_AWLEN[63:0]
+axixbar.S_AXI_AWLEN[7:0]
+@28
 [color] 2
-axixbar.S_AXI_AWBURST[15:0]
+axixbar.S_AXI_AWBURST[1:0]
 [color] 2
-axixbar.S_AXI_AWSIZE[23:0]
+axixbar.S_AXI_AWSIZE[2:0]
 [color] 2
-axixbar.S_AXI_AWCACHE[31:0]
-[color] 2
-axixbar.S_AXI_AWLOCK[7:0]
-[color] 2
-axixbar.S_AXI_AWPROT[23:0]
-[color] 2
-axixbar.S_AXI_AWQOS[31:0]
-@200
--
+axixbar.S_AXI_AWLOCK
 @22
 [color] 2
-axixbar.S_AXI_WVALID[7:0]
-[color] 3
-axixbar.S_AXI_WREADY[7:0]
+axixbar.S_AXI_AWCACHE[3:0]
+@28
 [color] 2
-axixbar.S_AXI_WDATA[255:0]
+axixbar.S_AXI_AWPROT[2:0]
+@22
 [color] 2
-axixbar.S_AXI_WSTRB[31:0]
-[color] 2
-axixbar.S_AXI_WLAST[7:0]
+axixbar.S_AXI_AWQOS[3:0]
 @200
 -
-@22
-[color] 3
-axixbar.S_AXI_BVALID[7:0]
+@28
 [color] 2
-axixbar.S_AXI_BREADY[7:0]
+axixbar.S_AXI_WVALID
 [color] 3
-axixbar.S_AXI_BID[15:0]
+axixbar.S_AXI_WREADY
+@22
+[color] 2
+axixbar.S_AXI_WDATA[31:0]
+[color] 2
+axixbar.S_AXI_WSTRB[3:0]
+@28
+[color] 2
+axixbar.S_AXI_WLAST
+@200
+-
+@28
 [color] 3
-axixbar.S_AXI_BRESP[15:0]
+axixbar.S_AXI_BVALID
+[color] 2
+axixbar.S_AXI_BREADY
+[color] 3
+axixbar.S_AXI_BID[1:0]
+[color] 3
+axixbar.S_AXI_BRESP[1:0]
 @1000200
 -Slave writes
 @200
 -
 @800200
 -Slave reads
+@28
+axixbar.S_AXI_ARVALID
+axixbar.S_AXI_ARREADY
+axixbar.S_AXI_ARID[1:0]
 @22
-[color] 2
-axixbar.S_AXI_ARVALID[7:0]
-[color] 3
-axixbar.S_AXI_ARREADY[7:0]
-[color] 2
-axixbar.S_AXI_ARID[15:0]
-[color] 2
-axixbar.S_AXI_ARADDR[255:0]
-[color] 6
-axixbar.S_AXI_ARLEN[63:0]
-[color] 2
-axixbar.S_AXI_ARBURST[15:0]
-[color] 2
-axixbar.S_AXI_ARSIZE[23:0]
-[color] 2
-axixbar.S_AXI_ARCACHE[31:0]
-[color] 2
-axixbar.S_AXI_ARLOCK[7:0]
-[color] 2
-axixbar.S_AXI_ARPROT[23:0]
-[color] 2
-axixbar.S_AXI_ARQOS[31:0]
+axixbar.S_AXI_ARADDR[15:0]
+axixbar.S_AXI_ARLEN[7:0]
+@28
+axixbar.S_AXI_ARBURST[1:0]
+axixbar.S_AXI_ARSIZE[2:0]
+axixbar.S_AXI_ARLOCK
+@22
+axixbar.S_AXI_ARCACHE[3:0]
+@28
+axixbar.S_AXI_ARPROT[2:0]
+@22
+axixbar.S_AXI_ARQOS[3:0]
 @200
 -
+@28
+axixbar.S_AXI_RVALID
+axixbar.S_AXI_RREADY
+axixbar.S_AXI_RID[1:0]
 @22
-[color] 3
-axixbar.S_AXI_RVALID[7:0]
-[color] 2
-axixbar.S_AXI_RREADY[7:0]
-[color] 3
-axixbar.S_AXI_RID[15:0]
-[color] 3
-axixbar.S_AXI_RDATA[255:0]
-[color] 3
-axixbar.S_AXI_RRESP[15:0]
-[color] 3
-axixbar.S_AXI_RLAST[7:0]
+axixbar.S_AXI_RDATA[31:0]
+@28
+axixbar.S_AXI_RLAST
+axixbar.S_AXI_RRESP[1:0]
 @1000200
 -Slave reads
 @c00200
 -Write arbitration
-@22
-axixbar.wrequest<0>[8:0]
-axixbar.wrequest<1>[8:0]
-axixbar.wrequest<3>[15:0]
-axixbar.wrequested<1>[15:0]
-axixbar.wrequested<2>[7:0]
-axixbar.wrequested<3>[7:0]
-axixbar.wrequested<4>[15:0]
 @200
 -
-@22
-axixbar.wgrant<0>[8:0]
-axixbar.wgrant<1>[8:0]
-axixbar.wgrant<2>[8:0]
-axixbar.wgrant<3>[8:0]
-@200
 -
 @22
 axixbar.mwgrant[3:0]
-axixbar.swgrant[7:0]
-axixbar.mwindex<0>[3:0]
-axixbar.mwindex<1>[3:0]
-axixbar.mwindex<2>[3:0]
-axixbar.mwindex<3>[3:0]
 @28
 axixbar.swindex<0>[1:0]
 axixbar.swindex<1>[1:0]
-axixbar.swindex<2>[1:0]
-axixbar.swindex<3>[1:0]
-axixbar.swindex<4>[1:0]
-axixbar.swindex<5>[1:0]
-axixbar.swindex<6>[1:0]
-axixbar.swindex<7>[1:0]
 @1401200
 -Write arbitration
-@c00200
+@800200
 -Read arbitration
-@22
-axixbar.rrequest<0>[8:0]
-axixbar.rrequest<1>[8:0]
-axixbar.rrequest<3>[15:0]
-axixbar.rrequested<1>[15:0]
-axixbar.rrequested<2>[7:0]
-axixbar.rrequested<3>[7:0]
-axixbar.rrequested<4>[15:0]
+@28
+axixbar.mrindex<0>
+axixbar.mrindex<1>
+axixbar.mrindex<2>
+axixbar.mrindex<3>
 @200
 -
 @22
 axixbar.mrgrant[3:0]
-axixbar.rgrant<0>[8:0]
-axixbar.rgrant<1>[8:0]
-axixbar.rgrant<2>[8:0]
-axixbar.rgrant<3>[8:0]
-axixbar.mrindex<0>[3:0]
-axixbar.mrindex<1>[3:0]
-axixbar.mrindex<2>[3:0]
-axixbar.mrindex<3>[3:0]
+@28
+axixbar.rgrant<0>[1:0]
+axixbar.rgrant<1>[1:0]
+axixbar.rgrant<2>[1:0]
+axixbar.rgrant<3>[1:0]
 @200
 -
-@22
-axixbar.srgrant[7:0]
 @28
+axixbar.srgrant
 axixbar.srindex<0>[1:0]
 axixbar.srindex<1>[1:0]
-axixbar.srindex<2>[1:0]
-axixbar.srindex<3>[1:0]
-axixbar.srindex<4>[1:0]
-axixbar.srindex<5>[1:0]
-axixbar.srindex<6>[1:0]
-axixbar.srindex<7>[1:0]
-@1401200
+@1000200
 -Read arbitration
-@22
-axixbar.fm_rd_nbursts<0>[17:0]
-axixbar.fm_rdid_nbursts<0>[17:0]
-axixbar.fm_rd_outstanding<0>[17:0]
-axixbar.fm_rdid_outstanding<0>[17:0]
 @200
 -
-@22
-axixbar.fs_rd_nbursts<0>[17:0]
-axixbar.fs_rd_outstanding<0>[17:0]
-@200
 -
-@22
-axixbar.CHECK_SLAVES<0>.slvi.f_axi_rd_nbursts[17:0]
-axixbar.fs_rdid_nbursts<0>[17:0]
-axixbar.CHECK_SLAVES<0>.slvi.f_axi_rd_outstanding[17:0]
-axixbar.fs_rdid_outstanding<0>[17:0]
-@200
 -
 @22
 axixbar.fm_rd_ckarlen<0>[7:0]
@@ -322,8 +257,11 @@ axixbar.fm_rd_cklen<0>[8:0]
 axixbar.fm_rd_cksize<0>[2:0]
 @200
 -
+@28
+axixbar.fs_rd_checkid<0>[1:0]
 @22
-axixbar.fs_rd_ckvalid[7:0]
+axixbar.fs_rd_ckaddr<0>[15:0]
+axixbar.fs_rd_ckarlen<0>[7:0]
 @28
 axixbar.fs_rd_ckburst<0>[1:0]
 @22
@@ -331,8 +269,13 @@ axixbar.fs_rd_ckincr<0>[7:0]
 axixbar.fs_rd_cklen<0>[8:0]
 @28
 axixbar.fs_rd_cksize<0>[2:0]
+axixbar.fs_rd_ckvalid
 @22
-axixbar.fs_rdid_ckign_nbursts<0>[17:0]
-axixbar.fs_rdid_ckign_outstanding<0>[17:0]
+axixbar.fs_rd_nbursts<0>[11:0]
+axixbar.fs_rd_outstanding<0>[11:0]
+axixbar.fs_rdid_ckign_nbursts<0>[11:0]
+axixbar.fs_rdid_ckign_outstanding<0>[11:0]
+axixbar.fs_rdid_nbursts<0>[11:0]
+axixbar.fs_rdid_outstanding<0>[11:0]
 [pattern_trace] 1
 [pattern_trace] 0

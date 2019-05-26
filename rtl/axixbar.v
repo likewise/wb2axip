@@ -2443,12 +2443,14 @@ module	axixbar #(
 		// Read grant checking
 		//
 		always @(*)
+			assert(mrgrant[N] == (rgrant[N] != 0));
+
+		always @(*)
 		for(iM=0; iM<=NS; iM=iM+1)
 		begin
 			if (rgrant[N][iM])
 			begin
 				assert((rgrant[N] ^ (1<<iM))==0);
-				assert(mrgrant[N]);
 				assert(mrindex[N] == iM);
 				if (iM < NS)
 				begin
@@ -2471,6 +2473,8 @@ module	axixbar #(
 		begin
 			assert($stable(rgrant[N]));
 			assert($stable(mrindex[N]));
+			if (!rgrant[N][NS])
+				assert(!mrempty[N]);
 		end
 	end endgenerate
 
@@ -3020,13 +3024,18 @@ module	axixbar #(
 		always @(*)
 		if (!swgrant[M])
 		begin
+			assert(!S_AXI_AWVALID[M]);
+			assert(!S_AXI_WVALID[M]);
 			assert(fs_awr_nbursts[M] == 0);
 			assert(fs_wr_pending[M] == 0);
 		end
 
 		always @(*)
 		if (!srgrant[M])
+		begin
+			assert(!S_AXI_ARVALID[M]);
 			assert(fs_rd_nbursts[M] == 0);
+		end
 
 		always @(*)
 		if (srgrant[M])
@@ -3284,6 +3293,46 @@ module	axixbar #(
 		// Read counter correlators
 		//
 
+		reg	[F_LGDEPTH-1:0]	fm_rdno_bursts, fm_rdno_outs;
+		reg	[F_LGDEPTH-1:0]	fc_rdno_bursts, fc_rdno_outs;
+		reg	[F_LGDEPTH-1:0]	fs_rdno_bursts, fs_rdno_outs;
+		reg	[F_LGDEPTH-1:0]	fc_rdid_bursts, fc_rdid_outs;
+		//
+		reg	[F_LGDEPTH-1:0]	fm_rdid_burstsm1, fm_rdid_outsm1;
+		reg	[F_LGDEPTH-1:0]	fm_rdno_burstsm1, fm_rdno_outsm1;
+		reg	[F_LGDEPTH-1:0]	fc_rdid_burstsm1, fc_rdid_outsm1;
+		reg	[F_LGDEPTH-1:0]	fc_rdno_burstsm1, fc_rdno_outsm1;
+		always @(*)
+			fm_rdno_bursts = (fm_rd_nbursts[N]-fm_rdid_nbursts[N]);
+		always @(*)
+			fm_rdno_outs   = (fm_rd_outstanding[N]-fm_rdid_outstanding[N]);
+		always @(*)
+			fs_rdno_bursts = (fs_rd_nbursts[mrindex[N]]-fs_rdid_nbursts[mrindex[N]]);
+		always @(*)
+			fs_rdno_outs   = (fs_rd_outstanding[mrindex[N]]-fs_rdid_outstanding[mrindex[N]]);
+		always @(*)
+			fc_rdno_bursts = fs_rdno_bursts+unrdno_bursts[N];
+		always @(*)
+			fc_rdno_outs   = fs_rdno_outs+unrdno_outstanding[N];
+		always @(*)
+			fc_rdid_bursts = fs_rdid_nbursts[mrindex[N]]+unrdid_bursts[N];
+		always @(*)
+			fc_rdid_outs   = fs_rdid_outstanding[mrindex[N]]+unrdid_outstanding[N];
+		//
+		//
+		always @(*)
+			fm_rdid_burstsm1 = fm_rdid_nbursts[N]-1;
+		always @(*)
+			fm_rdid_outsm1   = fm_rdid_outstanding[N]-1;
+		always @(*)
+			fm_rdno_burstsm1 = fm_rdno_bursts-1;
+		always @(*)
+			fm_rdno_outsm1   = fm_rdno_outs-1;
+		always @(*)
+			fc_rdid_burstsm1 = fc_rdid_bursts-1;
+		always @(*)
+			fc_rdid_outsm1   = fc_rdid_outs-1;
+
 		always @(*)
 		if (mrgrant[N] && !rgrant[N][NS])
 		begin
@@ -3296,21 +3345,22 @@ module	axixbar #(
 			assert(fm_rd_outstanding[N]
 			  == fs_rd_outstanding[mrindex[N]] + unrd_outstanding[N]);
 
-			assert((fm_rd_nbursts[N]-fm_rdid_nbursts[N])
-					== unrdno_bursts[N]
-				+(fs_rd_nbursts[mrindex[N]]
-					-fs_rdid_nbursts[mrindex[N]]));
-			assert(fm_rd_outstanding[N]-fm_rdid_outstanding[N]
-				== unrdno_outstanding[N]
-				+(fs_rd_outstanding[mrindex[N]]-fs_rdid_outstanding[mrindex[N]]));
+			assert(fm_rdid_nbursts[N]     == fc_rdid_bursts);
+			assert(fm_rdid_outstanding[N] == fc_rdid_outs);
+			assert(fm_rdno_bursts         == fc_rdno_bursts);
+			assert(fm_rdno_outs           == fc_rdno_outs);
 
 
-			assert(w_mrpending[N] == 
+			assert(w_mrpending[N] ==
 				fs_rd_nbursts[mrindex[N]] + unrd_bursts[N]
 				- (r_arvalid[N] ? 1:0));
 
 			if (M_AXI_RVALID[N])
 				assert(w_mrpending[N] > 0);
+			if (M_AXI_RVALID[N] && M_AXI_RLAST[N] && (r_rvalid[N]||S_AXI_RVALID[mrindex[N]]))
+				assert(w_mrpending[N] > 1 + (S_AXI_ARVALID[mrindex[N]]?1:0));
+			if (M_AXI_RVALID[N] && M_AXI_RLAST[N] && r_rvalid[N] && r_rlast[N] && S_AXI_RVALID[mrindex[N]])
+				assert(w_mrpending[N] > 2 + (S_AXI_ARVALID[mrindex[N]]?1:0));
 
 			//
 			// We assume above that the respective channel IDs are
@@ -3327,12 +3377,17 @@ module	axixbar #(
 				  == fs_rdid_outstanding[mrindex[N]]
 					+ unrdid_outstanding[N]);
 
-			assert((fm_rd_nbursts[N]-fm_rdid_nbursts[N])
-				== ((fs_rd_nbursts[mrindex[N]]-fs_rdid_nbursts[mrindex[N]])
-					+ unrdno_bursts[N]));
-			assert((fm_rd_outstanding[N]-fm_rdid_outstanding[N])
-				== (fs_rd_outstanding[mrindex[N]]-fs_rdid_outstanding[mrindex[N]])
-					+ unrdno_outstanding[N]);
+			assert(fm_rdno_bursts == fc_rdno_bursts);
+			assert(fm_rdno_outs   == fc_rdno_outs);
+			if (M_AXI_RVALID[N] && M_AXI_RLAST[N] && M_AXI_RID[IW*N+:IW] == fm_rd_checkid[N])
+				assert({ 8'h00, fm_rdid_outsm1 } <= { fc_rdid_burstsm1, 8'h00 });
+			else
+				assert({ 8'h00, fm_rdid_outstanding[N] } <= { fc_rdid_bursts, 8'h00 });
+			//
+			// if (M_AXI_RVALID[N] && M_AXI_RLAST[N] && M_AXI_RID[IW*N+:IW] != fm_rd_checkid[N])
+			//	assert({ 8'h00, fm_rdno_outsm1 } <= { fc_rdno_burstsm1, 8'h00 });
+			// else
+			//	assert({ 8'h00, fm_rdno_outs } <= { fc_rdno_bursts, 8'h00 });
 		end else begin
 			//
 			// Burst + outstanding counts and correlations
@@ -3519,6 +3574,10 @@ module	axixbar #(
 			if (r_arlock[N])
 				assert(!r_arcache[N][0]);
 		end
+
+		always @(*)
+		if (r_rvalid[N])
+			assert(M_AXI_RVALID[N]);
 
 
 	end endgenerate
@@ -3781,7 +3840,7 @@ module	axixbar #(
 			// rd_cover_fsm[15] <= 0;
 		// end
 
-		
+
 		for(iN=0; (iN<NM)&&(iN<NS); iN=iN+1)
 		begin
 			iM = iN+2; if (iM >= NS) iM=iM-NS;
