@@ -142,6 +142,19 @@ module	aximrd2wbsp #(
 	wire				fifo_full, fifo_nearfull;
 	wire				accept_request;
 
+	/*
+	skidbuffer axirqbuf(i_axi_clk, !i_axi_resetn,
+		i_axi_arvalid, o_axi_arready
+			{ i_axi_arid, i_axi_araddr, i_axi_arlen,
+			  i_axi_arsize, i_axi_arburst, i_axi_arlock,
+			  i_axi_arcache, i_axi_arprot, i_axi_arqos,
+			  i_axi_arvalid },
+		r_valid, accept_request,
+			{ w_arid, w_araddr, w_arlen,
+			  w_arsize, w_arburst, w_arlock,
+			  w_arcache, w_arprot, w_arqos,
+			  w_arvalid },
+	*/
 
 
 	assign	fifo_fill = (fifo_wptr - fifo_rptr);
@@ -150,10 +163,11 @@ module	aximrd2wbsp #(
 
 	assign	max_fifo_fill = (1<<LGFIFO);
 
-	assign	accept_request = (i_axi_reset_n)&&(!err_state)
+	assign	accept_request = (!err_state)
 			&&((!o_wb_cyc)||(!i_wb_err))
 			&&(!fifo_full)
-			&&((!o_wb_stb && stblen == 0 && !last_stb)||(o_wb_stb && last_stb && !i_wb_stall))
+			&&((!o_wb_stb && stblen == 0 && !last_stb)
+				||(o_wb_stb && last_stb && !i_wb_stall))
 			&&(r_valid ||((i_axi_arvalid)&&(o_axi_arready)))
 			// The request must fit into our FIFO before making
 			// it
@@ -220,7 +234,6 @@ module	aximrd2wbsp #(
 	begin
 		o_wb_stb <= 1'b0;
 		o_wb_cyc <= 1'b0;
-		incr     <= 1'b0;
 		stblen   <= 0;
 		last_stb <= 0;
 	end else if ((!o_wb_stb)||(!i_wb_stall))
@@ -235,8 +248,11 @@ module	aximrd2wbsp #(
 				o_wb_stb <= 1'b1;
 			last_stb <= (w_len == 0);
 
-			o_wb_addr <= w_addr[(C_AXI_ADDR_WIDTH-1):(C_AXI_ADDR_WIDTH-AW)];
-			incr <= w_burst[0];
+			// o_wb_addr <= w_addr[(C_AXI_ADDR_WIDTH-1):(C_AXI_ADDR_WIDTH-AW)];
+			axi_burst <= w_burst;
+			axi_size  <= w_size;
+			axi_len   <= w_len;
+			//
 			stblen <= w_len;
 			axi_id <= w_id;
 		end else if ((!o_wb_stb)&&((stblen > 0)||(last_stb)))
@@ -249,7 +265,7 @@ module	aximrd2wbsp #(
 			// Step forward on the burst request
 			last_stb <= (stblen == 1);
 
-			o_wb_addr <= o_wb_addr + ((incr)? 1'b1:1'b0);
+			// o_wb_addr <= o_wb_addr + ((incr)? 1'b1:1'b0);
 			stblen <= stblen - 1'b1;
 			if (fifo_nearfull)
 				o_wb_stb <= 1'b0;
@@ -280,6 +296,24 @@ module	aximrd2wbsp #(
 		o_wb_cyc <= 1'b0;
 		last_stb <= 1'b0;
 	end
+
+	always @(posedge i_clk)
+	if (accept_request)
+	begin
+		axi_id    <= w_id;
+		axi_burst <= w_burst;
+		axi_size  <= w_size;
+		axi_len   <= w_len;
+	end
+
+	always @(posedge i_clk)
+	if (accept_request)
+		axi_addr <= w_addr;
+	else if (!i_wb_stall)
+		axi_addr <= next_addr;
+
+	always @(*)
+		o_wb_addr = axi_addr[(C_AXI_ADDR_WIDTH-1):C_AXI_ADDR_WIDTH-AW)];
 
 	always @(*)
 		next_ackptr = fifo_ackptr + 1'b1;
