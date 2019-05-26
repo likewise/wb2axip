@@ -199,7 +199,6 @@ module faxi_master #(
 				rd_aligned, ard_aligned;
 	reg			rd_pending;
 	wire	[AW-1:0]	next_rd_addr;
-	reg			rd_pending;
 	//
 	// Let the solver pick some arbitrary ID's to be checked by this
 	// checker
