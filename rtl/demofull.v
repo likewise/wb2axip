@@ -958,7 +958,7 @@ module demofull #(
 
 	always @(*)
 		cover(!S_AXI_BVALID && axi_awready && !m_awvalid
-			&& f_wr_cvr_valid && (f_axi_awr_nbursts == 0));	//!!
+			&& f_wr_cvr_valid && (f_axi_awr_nbursts == 0));
 
 	reg	f_rd_cvr_valid;
 	initial	f_rd_cvr_valid = 0;

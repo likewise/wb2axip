@@ -66,7 +66,7 @@ module	fwbc_slave(i_clk, i_reset,
 	input	wire			i_wb_ack;
 	input	wire	[(DW-1):0]	i_wb_idata;
 	input	wire			i_wb_err;
-	input	wire			i_wb_rty = 1'b0;
+	input	wire			i_wb_rty;
 	//
 
 `define	SLAVE_ASSUME	assume
