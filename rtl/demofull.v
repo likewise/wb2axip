@@ -224,14 +224,7 @@ module demofull #(
 	localparam	AW = C_S_AXI_ADDR_WIDTH;
 	localparam	DW = C_S_AXI_DATA_WIDTH;
 	localparam	IW = C_S_AXI_ID_WIDTH;
-	localparam	LSB = (C_S_AXI_DATA_WIDTH == 8) ? 0
-			: ((C_S_AXI_DATA_WIDTH ==  16) ? 1
-			: ((C_S_AXI_DATA_WIDTH ==  32) ? 2
-			: ((C_S_AXI_DATA_WIDTH ==  64) ? 3
-			: ((C_S_AXI_DATA_WIDTH == 128) ? 4
-			: ((C_S_AXI_DATA_WIDTH == 256) ? 5
-			: ((C_S_AXI_DATA_WIDTH == 512) ? 6
-			: 7))))));
+	localparam	LSB = $clog2(C_S_AXI_DATA_WIDTH)-3;
 
 	// Double buffer the write response channel only
 	reg	[IW-1 : 0]	r_bid;
@@ -291,7 +284,7 @@ module demofull #(
 	end else if (m_awvalid && m_awready)
 	begin
 		axi_awready <= 0;
-		axi_wready <= 1;
+		axi_wready  <= 1;
 	end else if (S_AXI_WVALID && S_AXI_WREADY)
 	begin
 		axi_awready <= (S_AXI_WLAST)&&(!S_AXI_BVALID || S_AXI_BREADY);
@@ -300,7 +293,7 @@ module demofull #(
 	begin
 		if (S_AXI_WREADY)
 			axi_awready <= 1'b0;
-		else if ( r_bvalid && !S_AXI_BREADY)
+		else if (r_bvalid && !S_AXI_BREADY)
 			axi_awready <= 1'b0;
 		else
 			axi_awready <= 1'b1;
@@ -399,7 +392,6 @@ module demofull #(
 	reg	[AW-1:0]	raddr;
 
 	initial axi_arready = 1;
-	initial axi_rlast   = 0;
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_ARESETN)
 		axi_arready <= 1;
@@ -438,10 +430,18 @@ module demofull #(
 
 	axi_addr #(.AW(AW), .DW(DW))
 		get_next_rd_addr((S_AXI_ARREADY ? S_AXI_ARADDR : raddr),
-				(S_AXI_ARREADY ? S_AXI_ARSIZE  : rsize),
-				(S_AXI_ARBURST ? S_AXI_ARBURST : rburst),
-				(S_AXI_ARLEN   ? S_AXI_ARLEN   : rlen),
+				(S_AXI_ARREADY  ? S_AXI_ARSIZE : rsize),
+				(S_AXI_ARBURST  ? S_AXI_ARBURST: rburst),
+				(S_AXI_ARLEN    ? S_AXI_ARLEN  : rlen),
 				next_rd_addr);
+
+	always @(*)
+	begin
+		o_rd = (S_AXI_ARVALID || !S_AXI_ARREADY);
+		if (S_AXI_RVALID && !S_AXI_RREADY)
+			o_rd = 0;
+		o_raddr = (S_AXI_ARREADY ? S_AXI_ARADDR[AW-1:LSB] : raddr[AW-1:LSB]);
+	end
 
 	initial	axi_rvalid = 0;
 	always @(posedge S_AXI_ACLK)
@@ -461,24 +461,16 @@ module demofull #(
 			axi_rid <= rid;
 	end
 
+	initial axi_rlast   = 0;
 	always @(posedge S_AXI_ACLK)
 	if (!S_AXI_RVALID || S_AXI_RREADY)
 	begin
 		if (S_AXI_ARVALID && S_AXI_ARREADY)
 			axi_rlast <= (S_AXI_ARLEN == 0);
-		else if ((axi_rlen > 0)&&(S_AXI_RVALID))
+		else if (S_AXI_RVALID)
 			axi_rlast <= (axi_rlen == 2);
 		else
 			axi_rlast <= (axi_rlen == 1);
-	end
-
-
-	always @(*)
-	begin
-		o_rd = (S_AXI_ARVALID && S_AXI_ARREADY)||(!S_AXI_ARREADY);
-		if (S_AXI_RVALID && !S_AXI_RREADY)
-			o_rd = 0;
-		o_raddr = (S_AXI_ARREADY ? S_AXI_ARADDR[AW-1:LSB] : raddr[AW-1:LSB]);
 	end
 
 	always @(*)
@@ -553,7 +545,9 @@ module demofull #(
 		//
 		// Address write channel
 		//
-		.i_axi_awid(    m_awid),
+		.i_axi_awvalid(m_awvalid),
+		.i_axi_awready(m_awready),
+		.i_axi_awid(   m_awid),
 		.i_axi_awaddr( m_awaddr),
 		.i_axi_awlen(  m_awlen),
 		.i_axi_awsize( m_awsize),
@@ -562,8 +556,6 @@ module demofull #(
 		.i_axi_awcache(4'h0),
 		.i_axi_awprot( 3'h0),
 		.i_axi_awqos(  4'h0),
-		.i_axi_awvalid(m_awvalid),
-		.i_axi_awready(m_awready),
 	//
 	//
 		//
@@ -579,74 +571,37 @@ module demofull #(
 	//
 		// Response ID tag. This signal is the ID tag of the
 		// write response.
-		.i_axi_bid(S_AXI_BID),
-		.i_axi_bresp(S_AXI_BRESP),
 		.i_axi_bvalid(S_AXI_BVALID),
 		.i_axi_bready(S_AXI_BREADY),
+		.i_axi_bid(   S_AXI_BID),
+		.i_axi_bresp( S_AXI_BRESP),
 	//
 	//
 		//
 		// Read address channel
 		//
-		// Read address ID. This signal is the identification
-		// tag for the read address group of signals.
-		.i_axi_arid(S_AXI_ARID),
-		// Read address. This signal indicates the initial
-		// address of a read burst transaction.
-		.i_axi_araddr(S_AXI_ARADDR),
-		// Burst length. The burst length gives the exact number of
-		// transfers in a burst
-		.i_axi_arlen(S_AXI_ARLEN),
-		// Burst size. This signal indicates the size of each transfer
-		// in the burst
-		.i_axi_arsize(S_AXI_ARSIZE),
-		// Burst type. The burst type and the size information,
-		// determine how the address for each transfer within the
-		// burst is calculated.
-		.i_axi_arburst(S_AXI_ARBURST),
-		// Lock type. Provides additional information about the
-		// atomic characteristics of the transfer.
-		.i_axi_arlock(S_AXI_ARLOCK),
-		// Memory type. This signal indicates how transactions
-		// are required to progress through a system.
-		.i_axi_arcache(S_AXI_ARCACHE),
-		// Protection type. This signal indicates the privilege
-		// and security level of the transaction, and whether
-		// the transaction is a data access or an instruction access.
-		.i_axi_arprot(S_AXI_ARPROT),
-		// Quality of Service, QoS identifier sent for each
-		// read transaction.
-		.i_axi_arqos(S_AXI_ARQOS),
-		// Write address valid. This signal indicates that
-		// the channel is signaling valid read address and
-		// control information.
 		.i_axi_arvalid(S_AXI_ARVALID),
-		// Read address ready. This signal indicates that
-		// the slave is ready to accept an address and associated
-		// control signals.
 		.i_axi_arready(S_AXI_ARREADY),
+		.i_axi_arid(   S_AXI_ARID),
+		.i_axi_araddr( S_AXI_ARADDR),
+		.i_axi_arlen(  S_AXI_ARLEN),
+		.i_axi_arsize( S_AXI_ARSIZE),
+		.i_axi_arburst(S_AXI_ARBURST),
+		.i_axi_arlock( S_AXI_ARLOCK),
+		.i_axi_arcache(S_AXI_ARCACHE),
+		.i_axi_arprot( S_AXI_ARPROT),
+		.i_axi_arqos(  S_AXI_ARQOS),
 	//
 	//
 		//
 		// Read data return channel
 		//
-		// Read ID tag. This signal is the identification tag
-		// for the read data group of signals generated by the slave.
-		.i_axi_rid(S_AXI_RID),
-		// Read Data
-		.i_axi_rdata(S_AXI_RDATA),
-		// Read response. This signal indicates the status of
-		// the read transfer.
-		.i_axi_rresp(S_AXI_RRESP),
-		// Read last. This signal indicates the last transfer
-		// in a read burst.
-		.i_axi_rlast(S_AXI_RLAST),
-		// Read valid. This signal indicates that the channel
-		// is signaling the required read data.
 		.i_axi_rvalid(S_AXI_RVALID),
-		// Read ready. This signal indicates that the master can
-		// accept the read data and response information.
 		.i_axi_rready(S_AXI_RREADY),
+		.i_axi_rid(S_AXI_RID),
+		.i_axi_rdata(S_AXI_RDATA),
+		.i_axi_rresp(S_AXI_RRESP),
+		.i_axi_rlast(S_AXI_RLAST),
 		//
 		// Formal outputs
 		//
@@ -678,6 +633,7 @@ module demofull #(
 		.f_axi_rdid_ckign_outstanding(f_axi_rdid_ckign_outstanding)
 	);
 
+/*
 	always @(posedge S_AXI_ACLK)
 	if (!f_past_valid || !$past(S_AXI_ARESETN))
 		assume(!S_AXI_AWVALID);
@@ -690,6 +646,7 @@ module demofull #(
 		assume($stable(S_AXI_AWSIZE));
 		assume($stable(S_AXI_AWBURST));
 	end
+*/
 
 	//
 
@@ -704,11 +661,14 @@ module demofull #(
 		assert(f_axi_awr_nbursts <= 2);
 	always @(*)
 	if (f_axi_awr_nbursts == 2)
-		assert(S_AXI_BVALID && (r_bvalid || (f_axi_wr_pending>0)));
+		assert(S_AXI_BVALID && (r_bvalid || S_AXI_WREADY));
 	else if (f_axi_awr_nbursts == 1)
-		assert(S_AXI_BVALID ^ (f_axi_wr_pending>0));
+		assert(S_AXI_BVALID ^ S_AXI_WREADY);
 	else
-		assert(!S_AXI_BVALID && (f_axi_wr_pending == 0));
+		assert(!S_AXI_BVALID && !S_AXI_WREADY);
+
+	always @(*)
+		assert(S_AXI_WREADY == (f_axi_wr_pending > 0));
 
 	always @(*)
 	if (f_axi_wrid_nbursts == 2)
@@ -729,27 +689,20 @@ module demofull #(
 		assert(S_AXI_BVALID);
 
 	always @(*)
-	if ((f_axi_wr_pending > 0)||(r_bvalid))
-		assert(1 || !axi_awready);
-	else
-		assert(axi_awready);
-
-	always @(*)
-	if (f_axi_wr_pending > 0)
-	begin
-		assert(f_axi_wr_addr  == waddr);
-		assert(f_axi_wr_burst == wburst);
-		assert(f_axi_wr_size  == wsize);
-		assert(f_axi_wr_len   == wlen);
-	end
+		assert(axi_awready == (!S_AXI_WREADY&& !r_bvalid));
 
 	always @(*)
 	if (axi_awready)
 		assert(!S_AXI_WREADY);
 
 	always @(*)
-	if (m_awready && !axi_awready)
-		assert(f_axi_awr_nbursts == 1 + (S_AXI_BVALID ? 1:0));
+	if (S_AXI_WREADY)
+	begin
+		assert(f_axi_wr_addr  == waddr);
+		assert(f_axi_wr_burst == wburst);
+		assert(f_axi_wr_size  == wsize);
+		assert(f_axi_wr_len   == wlen);
+	end
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -769,13 +722,14 @@ module demofull #(
 
 	always @(*)
 		assert(axi_rlen == f_axi_rd_outstanding);
-	always @(*)
-	if (f_axi_rd_nbursts>0)
-		assert(S_AXI_RVALID);
 
 	always @(*)
-	if (f_axi_rd_nbursts == 2)
-		assert(S_AXI_RLAST);
+	if (f_axi_rd_nbursts > 0)
+	begin
+		assert(S_AXI_RVALID);
+		assert(!S_AXI_ARREADY || (S_AXI_RVALID && S_AXI_RLAST));
+	end else
+		assert(S_AXI_ARREADY);
 
 	always @(*)
 	if (f_axi_rdid_nbursts == 2)
@@ -803,20 +757,10 @@ module demofull #(
 		assert(!S_AXI_RVALID || S_AXI_RID != f_axi_rd_checkid);
 	end
 
-	always @(*)
-	if (f_axi_rd_nbursts > 0)
-		assert(!S_AXI_ARREADY || (S_AXI_RVALID && S_AXI_RLAST));
 
 	always @(*)
 	if (f_axi_rd_ckvalid)
 		assert(f_axi_rd_outstanding == f_axi_rd_cklen);
-
-	always @(*)
-	if (S_AXI_ARREADY)
-	begin
-		assert(f_axi_rd_outstanding <= 1);
-		assert(!S_AXI_RVALID || S_AXI_RLAST);
-	end
 
 	always @(posedge S_AXI_ACLK)
 	if (o_rd)
@@ -888,20 +832,6 @@ module demofull #(
 		end
 	end
 
-	always @(*)
-	if (f_axi_rd_outstanding > 0)
-	begin
-		if (S_AXI_RVALID && S_AXI_RLAST)
-			assert(f_axi_rd_nbursts==2
-				|| axi_rlen == f_axi_rd_outstanding);
-	end
-
-	always @(*)
-	if (f_axi_rd_outstanding == 0)
-	begin
-		assert(S_AXI_ARREADY);
-	end
-
 	always @(posedge S_AXI_ACLK)
 	if (f_past_valid && $rose(S_AXI_RLAST))
 		assert(S_AXI_ARREADY);
@@ -940,6 +870,12 @@ module demofull #(
 			&& (f_axi_rd_ckaddr == f_const_addr)
 			&& (f_axi_rdid_ckign_outstanding == 0))
 		assert(S_AXI_RDATA == f_const_rvalue);
+
+	always @(*)
+	if (!S_AXI_RVALID || S_AXI_RREADY)
+		assert(o_rd == (S_AXI_ARVALID && S_AXI_ARREADY) || !S_AXI_ARREADY);
+	else
+		assert(o_rd == 0);
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -1015,6 +951,23 @@ module demofull #(
 			&& (f_axi_rd_nbursts == 0)
 			&& !S_AXI_ARVALID && !S_AXI_RVALID);
 
+`ifdef	VERIFIC
+	cover property (@(posedge S_AXI_ACLK)
+		disable iff (!S_AXI_ARESETN)
+		// Accept a burst request for 4 beats
+		S_AXI_ARVALID && S_AXI_ARREADY && (S_AXI_ARLEN == 3)
+		// The first three beats
+		##1 S_AXI_RVALID && S_AXI_RREADY [*3]
+		// The last read beat, where we accept the next request
+		##1 S_AXI_ARVALID && S_AXI_ARREADY && (S_AXI_ARLEN == 3)
+			&& S_AXI_RVALID && S_AXI_RDATA && S_AXI_RLAST
+		// The next three beats of data, and
+		##1 S_AXI_RVALID && S_AXI_RREADY [*3]
+		// The final beat of the transaction
+		##1 S_AXI_RVALID && S_AXI_RDATA && S_AXI_RLAST
+		// The return to idle
+		##1 !S_AXI_RVALID && !S_AXI_ARVALID);
+`endif
 
 	////////////////////////////////////////////////////////////////////////
 	//
