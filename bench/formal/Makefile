@@ -51,6 +51,7 @@ WBARB      := wbarbiter
 DECODER    := addrdecode
 SFIFO      := sfifo
 SKIDBUFFER := skidbuffer
+AXI_ADDR   := axi_addr
 XBAR := $(RTL)/$(DECODER).v $(RTL)/$(SKIDBUFFER).v
 #
 # Slaves
@@ -444,6 +445,31 @@ $(SKIDBUFFER)_cvr/PASS:  $(SKIDBUFFER).sby $(RTL)/$(SKIDBUFFER).v
 
 
 
+.PHONY: $(AXI_ADDR)
+$(AXI_ADDR): axi_addr_miter_prf8/PASS
+$(AXI_ADDR): axi_addr_miter_prf16/PASS
+$(AXI_ADDR): axi_addr_miter_prf32/PASS
+$(AXI_ADDR): axi_addr_miter_prf64/PASS
+$(AXI_ADDR): axi_addr_miter_prf128/PASS
+$(AXI_ADDR): axi_addr_miter_prf256/PASS
+$(AXI_ADDR): axi_addr_miter_prf512/PASS
+$(AXI_ADDR): axi_addr_miter_prf1024/PASS
+axi_addr_miter_prf8/PASS: $(RTL)/$(AXI_ADDR).v
+	sby -f $(AXI_ADDR)_miter.sby prf8
+axi_addr_miter_prf16/PASS: $(RTL)/$(AXI_ADDR).v
+	sby -f $(AXI_ADDR)_miter.sby prf16
+axi_addr_miter_prf32/PASS: $(RTL)/$(AXI_ADDR).v
+	sby -f $(AXI_ADDR)_miter.sby prf32
+axi_addr_miter_prf64/PASS: $(RTL)/$(AXI_ADDR).v
+	sby -f $(AXI_ADDR)_miter.sby prf64
+axi_addr_miter_prf128/PASS: $(RTL)/$(AXI_ADDR).v
+	sby -f $(AXI_ADDR)_miter.sby prf128
+axi_addr_miter_prf256/PASS: $(RTL)/$(AXI_ADDR).v
+	sby -f $(AXI_ADDR)_miter.sby prf256
+axi_addr_miter_prf512/PASS: $(RTL)/$(AXI_ADDR).v
+	sby -f $(AXI_ADDR)_miter.sby prf512
+axi_addr_miter_prf1024/PASS: $(RTL)/$(AXI_ADDR).v
+	sby -f $(AXI_ADDR)_miter.sby prf1024
 
 .PHONY: clean
 clean:
