@@ -50,7 +50,7 @@ module	axi_addr(i_last_addr,
 	parameter	AW = 32,
 			DW = 32;
 	input	wire	[AW-1:0]	i_last_addr;
-	input	wire	[2:0]		i_size; // 1b, 2b, 4b, 8b, etc
+	input	wire	[2:0]		i_size; // 2^i_size Bytes; 1 Byte, 2 Bytes, 4 Bytes, ..., 128 Bytes.
 	input	wire	[1:0]		i_burst; // fixed, incr, wrap, reserved
 	input	wire	[7:0]		i_len;
 	output	reg	[AW-1:0]	o_next_addr;
@@ -65,7 +65,7 @@ module	axi_addr(i_last_addr,
 	always @(*)
 	begin
 		increment = 0;
-		if (i_burst != 0)
+		if (i_burst != FIXED)
 		begin
 			if (DSZ == 0)
 				increment = 1;
