@@ -87,9 +87,11 @@ module skidbuffer(i_clk, i_reset,
 	parameter	[0:0]	OPT_PASSTHROUGH = 0;
 	parameter		DW = 8;
 	input	wire			i_clk, i_reset;
+  // our sink
 	input	wire			i_valid;
 	output	reg			o_ready;
 	input	wire	[DW-1:0]	i_data;
+  // our source
 	output	reg			o_valid;
 	input	wire			i_ready;
 	output	reg	[DW-1:0]	o_data;
