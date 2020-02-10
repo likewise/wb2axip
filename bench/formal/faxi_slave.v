@@ -525,7 +525,8 @@ module faxi_slave #(
 	// Count outstanding transactions.  With these measures, we count
 	// once per any burst.
 	//
-	//
+  // @TODO I think data beats are counted, not transactions. - Leon
+	// @NOTE It includes a beat in the current clock cycle
 	////////////////////////////////////////////////////////////////////////
 	//
 	//
@@ -539,20 +540,24 @@ module faxi_slave #(
 		f_axi_wr_pending <= 0;
 		// ...
 	end else case({ axi_awr_req, axi_wr_req })
+  // address write beat only?
 	2'b10: begin
 		f_axi_wr_pending <= i_axi_awlen+1;
 		// ...
 		end
+  // data write beat only?
 	2'b01: begin
 		`SLAVE_ASSUME(f_axi_wr_pending > 0);
-		f_axi_wr_pending <= f_axi_wr_pending - 1'b1;
+		f_axi_wr_pending <= f_axi_wr_pending - 1'b1/*w*/;
+    // WLAST only if 1 pending
 		`SLAVE_ASSUME(!i_axi_wlast || (f_axi_wr_pending == 1));
 		// ...
 		end
+  // address and data write beat only?
 	2'b11: begin
 		// ...
 		if (f_axi_wr_pending > 0)
-			f_axi_wr_pending <= i_axi_awlen+1;
+			f_axi_wr_pending <= f_axi_wr_pending + (i_axi_awlen+1)/*aw*/ - 1'b1/*w*/ ;
 		else begin
 			f_axi_wr_pending <= i_axi_awlen;
 			// ...
@@ -580,9 +585,7 @@ module faxi_slave #(
 	else case({ (axi_awr_req), (axi_wr_ack) })
 	2'b10: f_axi_awr_nbursts <= f_axi_awr_nbursts + 1'b1;
 	2'b01: f_axi_awr_nbursts <= f_axi_awr_nbursts - 1'b1;
-	default: begin
-	//	f_axi_awr_nbursts <= f_axi_awr_nbursts;
-	end
+	default: begin end
 	endcase
 
 	//
@@ -764,7 +767,7 @@ module faxi_slave #(
 	// waiting
 	//
 	always @(posedge i_clk)
-	if (f_axi_wr_pending > 1)
+	if (f_past_valid && $past(f_axi_wr_pending) > 1)
 		`SLAVE_ASSERT(!i_axi_awready);
 
 	////////////////////////////////////////////////////////////////////////
