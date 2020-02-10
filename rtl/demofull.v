@@ -504,6 +504,11 @@ module demofull #(
 	if (!f_past_valid)
 		assume(!S_AXI_ARESETN);
 
+  always @(*)
+  if (f_past_valid)
+    assume(S_AXI_ARESETN);
+
+
         // F_LGDEPTH is the number of bits necessary to count the maximum
         // number of items in flight.
         localparam                               F_LGDEPTH      = 10;
@@ -595,6 +600,14 @@ module demofull #(
 		// ...
 		// }}}
 	);
+
+//  always @(posedge S_AXI_ACLK)
+  // @NOTE f_axi_wr_pending is delayed, this assumption must be reviewer
+  always @(*)
+  if (S_AXI_ARESETN && S_AXI_WVALID)
+  begin
+    assume(S_AXI_WLAST == (f_axi_wr_pending == 1));
+   end
 
 	//
 
