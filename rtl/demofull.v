@@ -504,6 +504,16 @@ module demofull #(
 	if (!f_past_valid)
 		assume(!S_AXI_ARESETN);
 
+        // F_LGDEPTH is the number of bits necessary to count the maximum
+        // number of items in flight.
+        localparam                               F_LGDEPTH      = 10;
+
+        wire     [F_LGDEPTH-1:0]         f_axi_awr_nbursts;
+        wire     [9-1:0]                 f_axi_wr_pending;
+        wire     [F_LGDEPTH-1:0]         f_axi_rd_nbursts;
+        wire     [F_LGDEPTH-1:0]         f_axi_rd_outstanding;
+
+
 	faxi_slave	#(
 		// {{{
 		.C_AXI_ID_WIDTH(C_S_AXI_ID_WIDTH),
@@ -575,6 +585,12 @@ module demofull #(
 		.i_axi_rdata(S_AXI_RDATA),
 		.i_axi_rresp(S_AXI_RRESP),
 		.i_axi_rlast(S_AXI_RLAST),
+
+		.f_axi_awr_nbursts(f_axi_awr_nbursts),
+		.f_axi_wr_pending(f_axi_wr_pending),
+		.f_axi_rd_nbursts(f_axi_rd_nbursts),
+		.f_axi_rd_outstanding(f_axi_rd_outstanding)
+
 		//
 		// ...
 		// }}}
@@ -660,7 +676,7 @@ module demofull #(
 
 	always @(*)
 		cover(!S_AXI_BVALID && axi_awready && !m_awvalid
-			&& f_wr_cvr_valid /* && ... */));
+			&& f_wr_cvr_valid /* && ... */);
 
 	initial	f_rd_cvr_valid = 0;
 	always @(posedge S_AXI_ACLK)

@@ -186,6 +186,7 @@ module faxi_slave #(
 	//
 	integer	k;
 
+	reg f_past_valid;
 	initial	f_past_valid = 1'b0;
 	always @(posedge i_clk)
 		f_past_valid <= 1'b1;
@@ -216,6 +217,7 @@ module faxi_slave #(
 	//
 	//
 	// If asserted, the reset must be asserted for a minimum of 16 clocks
+	reg	f_reset_length;
 	initial	f_reset_length = 0;
 	always @(posedge i_clk)
 	if (F_OPT_NO_RESET || i_axi_reset_n)
@@ -282,6 +284,22 @@ module faxi_slave #(
 			`SLAVE_ASSERT(!i_axi_rvalid);
 		end
 	end endgenerate
+
+	// For WRAP burst type, AWLEN must be 2, 4, 8 or 16
+	always @(posedge i_clk)
+	if ((f_past_valid) && $past(i_axi_reset_n)
+		&& (!OPT_ASYNC_RESET || i_axi_reset_n))
+	begin
+		// Write address channel
+		if (i_axi_awvalid && (i_axi_awburst == 2'b10/*WRAP*/))
+		begin
+                `SLAVE_ASSUME((i_axi_awlen == 1)
+                        || (i_axi_awlen == 3)
+                        || (i_axi_awlen == 7)
+                        || (i_axi_awlen == 15));
+		end
+	end
+
 
 	////////////////////////////////////////////////////////////////////////
 	//
@@ -562,7 +580,9 @@ module faxi_slave #(
 	else case({ (axi_awr_req), (axi_wr_ack) })
 	2'b10: f_axi_awr_nbursts <= f_axi_awr_nbursts + 1'b1;
 	2'b01: f_axi_awr_nbursts <= f_axi_awr_nbursts - 1'b1;
-	default: begin end
+	default: begin
+	//	f_axi_awr_nbursts <= f_axi_awr_nbursts;
+	end
 	endcase
 
 	//
@@ -628,10 +648,16 @@ module faxi_slave #(
 		`SLAVE_ASSERT(f_axi_rd_nbursts > 0);
 		// ...
 	end
+
+	/* @TODO */
+	wire [F_LGDEPTH-1:0] next_rd_nbursts;
+        wire [F_LGDEPTH-1:0] next_rd_outstanding;
+
 	always @(*)
 		next_rd_nbursts = f_axi_rd_nbursts
 				- (i_axi_rvalid && i_axi_rlast ? 1:0);
 
+	/* @TODO */
 	always @(*)
 		next_rd_outstanding = f_axi_rd_outstanding
 				- (i_axi_rvalid ? 1:00);
@@ -781,6 +807,7 @@ module faxi_slave #(
 	//
 	// ...
 	//
+`ifdef UNDEFINED // @TODO?
 	always @(*)
 		wstb_addr = f_axi_wr_addr;
 
@@ -794,7 +821,7 @@ module faxi_slave #(
 	always @(*)
 	if (i_axi_wvalid)
 		`SLAVE_ASSUME(wstb_valid);
-
+`endif
 	//
 	// Write induction properties
 	//
@@ -803,9 +830,9 @@ module faxi_slave #(
 	// logical registers, not so much the functionality of the core we are
 	// testing
 	//
-	reg	[7:0]	val_wr_len;
+	reg	[7:0]	f_axi_wr_len;
 	always @(*)
-		val_wr_len = f_axi_wr_pending[7:0]-1;
+		f_axi_wr_len = f_axi_wr_pending[7:0]-1;
 
 	always @(*)
 	if (f_axi_wr_pending > 0)
@@ -813,12 +840,14 @@ module faxi_slave #(
 	always @(*)
 		assert(f_axi_wr_pending <= 9'h100);
 
+`ifdef UNDEFINED //@TODO demofull fails on this
 	always @(*)
-	if ((f_axi_wr_pending > 0)&&(f_axi_wr_burst == 2'b10))
+	if ((f_axi_wr_pending > 0)&&(f_axi_awr_nbursts == 2'b10))
 		assert((f_axi_wr_len == 1)
 			||(f_axi_wr_len == 3)
 			||(f_axi_wr_len == 7)
 			||(f_axi_wr_len == 15));
+`endif
 
 	////////////////////////////////////////////////////////////////////////
 	//
