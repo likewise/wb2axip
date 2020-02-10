@@ -17,9 +17,13 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
+// Modified by: Leon Woestenberg, MSc
+//              Sidebranch
+//
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (C) 2019, Gisselquist Technology, LLC
+// Copyright (C) 2020, Leon Woestenberg <leon@sidebranch.com>, Sidebranch
 //
 // This file is part of the WB2AXIP project.
 //

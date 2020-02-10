@@ -11,9 +11,13 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
+// Modified by: Leon Woestenberg, MSc 
+//              Sidebranch                 
+//
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2017-2019, Gisselquist Technology, LLC
+// Copyright (C) 2019, Gisselquist Technology, LLC
+// Copyright (C) 2020, Leon Woestenberg <leon@sidebranch.com>, Sidebranch 
 //
 // This file is part of the pipelined Wishbone to AXI converter project, a
 // project that contains multiple bus bridging designs and formal bus property
@@ -767,7 +771,7 @@ module faxi_slave #(
 	// waiting
 	//
 	always @(posedge i_clk)
-	if (f_past_valid && $past(f_axi_wr_pending) > 1)
+	if (f_past_valid && $past(f_axi_wr_pending) > 2)
 		`SLAVE_ASSERT(!i_axi_awready);
 
 	////////////////////////////////////////////////////////////////////////
