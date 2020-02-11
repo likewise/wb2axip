@@ -19,13 +19,13 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-// Modified by: Leon Woestenberg, MSc 
-//              Sidebranch                 
+// Modified by: Leon Woestenberg, MSc
+//              Sidebranch
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (C) 2019, Gisselquist Technology, LLC
-// Copyright (C) 2020, Leon Woestenberg <leon@sidebranch.com>, Sidebranch 
+// Copyright (C) 2020, Leon Woestenberg <leon@sidebranch.com>, Sidebranch
 //
 // This file is part of the WB2AXIP project.
 //
@@ -282,20 +282,30 @@ module demofull #(
 	begin
 		axi_awready  <= 1;
 		axi_wready   <= 0;
+	// address write beat?
 	end else if (m_awvalid && m_awready)
 	begin
 		axi_awready <= 0;
+		// { burst awlen is known, we can stall if there is no room in the peripheral }
 		axi_wready  <= 1;
+	// data write beat?
 	end else if (S_AXI_WVALID && S_AXI_WREADY)
 	begin
-		axi_awready <= (S_AXI_WLAST)&&(!S_AXI_BVALID || S_AXI_BREADY);
+		// address write ready after last data beat iff no stall on response channel
+		// (!S_AXI_BVALID || S_AXI_BREADY) == !(S_AXI_BVALID && !S_AXI_BREADY)
+		axi_awready <= (S_AXI_WLAST) && (!S_AXI_BVALID || S_AXI_BREADY);
+		// keep write channel ready during complete burst, but not afterwards
 		axi_wready  <= (!S_AXI_WLAST);
+	// address write channel not ready?
 	end else if (!axi_awready)
 	begin
+		// stay unready during pause in write burst (S_AXI_WVALID is deasserted here)
 		if (S_AXI_WREADY)
 			axi_awready <= 1'b0;
+		// stay unready if response channel is stalled (@TODO skidbuffer)
 		else if (r_bvalid && !S_AXI_BREADY)
 			axi_awready <= 1'b0;
+		// become ready for new burst; @TODO I wonder if we ever get here, I would expect WLAST
 		else
 			axi_awready <= 1'b1;
 	end
@@ -303,13 +313,17 @@ module demofull #(
 	always @(posedge S_AXI_ACLK)
 	if (m_awready)
 	begin
+		// read from AW skid buffer */
 		waddr    <= m_awaddr;
 		wburst   <= m_awburst;
 		wsize    <= m_awsize;
 		wlen     <= m_awlen;
+	// calculate next address for next data beat in the burst beat
+	// @TODO why not have this as first if-condition?
 	end else if (S_AXI_WVALID)
 		waddr <= next_wr_addr;
 
+	// based on burst details, calculate address for next data beat
 	axi_addr #(.AW(AW), .DW(DW))
 		get_next_wr_addr(waddr, wsize, wburst, wlen,
 			next_wr_addr);
